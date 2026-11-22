@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f5f5f6; color:#1a1a1a; }
+  header { padding:12px 16px; background:#ffffff; border-bottom:1px solid #e4e4e7; position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:17px; font-weight:700; letter-spacing:.02em; }
+  main { padding:16px 16px 80px; max-width:860px; margin:0 auto; }
+  .toolbar { background:#ffffff; border:1px solid #e4e4e7; border-radius:14px; padding:12px 14px 6px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; align-items:center; }
+  .chip { padding:6px 12px; border-radius:999px; border:1px solid #dcdce0; background:#ffffff; color:#333333; cursor:pointer; font-size:13px; }
+  .chip:hover { background:#f4f4f5; }
+  .chip.on { background:#111111; border-color:#111111; color:#ffffff; }
+  .seg { display:inline-flex; border:1px solid #dcdce0; border-radius:10px; overflow:hidden; margin:8px 0; }
+  .seg .chip { border:none; border-radius:0; border-right:1px solid #ececf0; padding:7px 14px; }
+  .seg .chip:last-child { border-right:none; }
+  .filterrow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 10px; }
+  .filterrow .seg { margin:0; }
+  .fsel { width:auto; padding:8px 10px; border:1px solid #dcdce0; border-radius:10px; background:#ffffff; font-size:13px; color:#1a1a1a; cursor:pointer; }
+  #searchBox { width:100%; padding:10px 12px; border:1px solid #dcdce0; border-radius:10px; font-size:14px; background:#fafafa; }
+  #searchBox:focus { outline:none; border-color:#111111; background:#ffffff; }
+  .card { background:#ffffff; border:1px solid #e4e4e7; border-radius:14px; padding:12px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card img.flyer { width:100%; border-radius:10px; display:block; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-right:6px; border:1px solid #dcdce0; color:#333333; background:#ffffff; }
+  .b-hold { border-style:dashed; }
+  .b-conf { }
+  .b-pub { background:#111111; color:#ffffff; border-color:#111111; }
+  .title { font-size:16px; font-weight:700; margin:6px 0 2px; }
+  .meta { font-size:13px; color:#555555; line-height:1.5; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  button, .btn { appearance:none; border:1px solid #dcdce0; background:#ffffff; color:#1a1a1a; border-radius:8px; padding:8px 12px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+  button:hover, .btn:hover { background:#f4f4f5; }
+  button.primary, .btn.primary { background:#111111; border-color:#111111; color:#ffffff; font-weight:700; }
+  button.primary:hover, .btn.primary:hover { background:#333333; }
+  button:disabled { opacity:.5; }
+  .fab { position:fixed; right:16px; bottom:16px; z-index:6; background:#111111; color:#ffffff; border:none; border-radius:999px; padding:14px 20px; font-size:15px; font-weight:700; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+  dialog { background:#ffffff; color:#1a1a1a; border:1px solid #e4e4e7; border-radius:14px; width:min(680px,94vw); max-height:92vh; overflow:auto; box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  dialog::backdrop { background:rgba(0,0,0,.35); }
+  label { display:block; font-size:12px; color:#555555; margin:12px 0 4px; }
+  input, select, textarea { width:100%; padding:9px; border-radius:8px; border:1px solid #c9c9ce; background:#ffffff; color:#1a1a1a; font-size:14px; }
+  textarea { min-height:90px; }
+  .warn { background:#f7f7f8; color:#1a1a1a; border:1px solid #dcdce0; border-radius:8px; padding:8px 10px; font-size:13px; margin-top:10px; display:none; }
+  .note { font-size:12px; color:#777777; }
+  .msg { position:fixed; left:50%; transform:translateX(-50%); bottom:84px; background:#111111; border:1px solid #111111; color:#ffffff; padding:10px 16px; border-radius:999px; font-size:13px; display:none; z-index:9; max-width:92vw; text-align:center; }
+  /* 切り抜きUI */
+  #cropWrap { position:relative; display:none; margin-top:8px; user-select:none; touch-action:none; }
+  #flyerDrop { border:2px dashed #999; border-radius:8px; padding:10px; }
+  #flyerDrop.over { border-color:#111; background:#f0f0f0; }
+  #cropWrap img { width:100%; display:block; border-radius:8px; }
+  /* v22: 枠は白+黒の二重ラインで常時表示し、黒い画像でも白い画像でも見えるようにする */
+  #cropBox { position:absolute; border:3px solid #ffffff; outline:2px solid #111111; box-shadow:inset 0 0 0 2px rgba(0,0,0,.55); background:rgba(0,0,0,.05); cursor:move; }
+  #cropHandle { position:absolute; right:-12px; bottom:-12px; width:24px; height:24px; border-radius:50%; background:#ffffff; border:2px solid #111111; cursor:nwse-resize; }
+  #cropWrap.light #cropBox { border-color:#ffffff; background:rgba(255,255,255,.08); box-shadow:0 0 0 1px rgba(0,0,0,.35); }
+  #cropWrap.light #cropHandle { background:#ffffff; }
+  .sync { font-size:11px; color:#666666; }
+  .sync b { color:#111111; font-weight:700; }
+  /* 日時ピッカー */
+  .dtbtn { width:100%; text-align:left; padding:9px; border:1px solid #c9c9ce; background:#ffffff; border-radius:8px; color:#111111; font-size:14px; cursor:pointer; }
+  .dtpanel { background:#ffffff; border:1px solid #dcdce0; border-radius:8px; padding:10px; margin-top:6px; }
+  .dtpanel .calhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .dtpanel table { width:100%; border-collapse:collapse; }
+  .dtpanel th { font-size:11px; color:#666666; padding:3px 0; }
+  .dtpanel td { text-align:center; padding:2px 0; }
+  .dtday { width:34px; height:34px; border-radius:50%; border:none; background:transparent; color:#111111; cursor:pointer; font-size:13px; padding:0; }
+  .dtday.sel { background:#111111; color:#ffffff; font-weight:700; }
+  .dtday.today { border:1px solid #111111; }
+  .timerow { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .timerow select { width:auto; flex:1; }
+  /* 表示切替 (カード/リスト/グリッド/カレンダー) */
+  .cardhead { cursor:pointer; }
+  .card img.banner { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:10px; display:block; background:#f0f0f1; }
+  .carddetail { display:none; }
+  .card.open .carddetail { display:block; }
+  .medialist { margin:6px 0; }
+  .medialist .mhead { font-size:12px; color:#666; margin-bottom:4px; }
+  .medialist a { display:block; padding:6px 8px; margin:4px 0; background:#f5f5f6; border:1px solid #e4e4e7; border-radius:8px; color:#1a73e8; text-decoration:none; word-break:break-all; font-size:13px; }
+  .mrow { position:relative; }
+  .mrow .mdel { position:absolute; top:4px; right:4px; }
+  .mdel { border:1px solid #dcdce0; background:#fff; border-radius:50%; width:24px; height:24px; line-height:1; color:#888; cursor:pointer; flex:none; }
+  .mediaadd { display:flex; gap:6px; margin:6px 0; }
+  .mediaadd input { flex:1; }
+  .inrow { display:flex; gap:6px; margin:4px 0; align-items:center; }
+  .inrow input { flex:1; }
+  .addbtn { margin:2px 0 8px; }
+  .mphoto, .mvideo { max-width:340px; max-height:340px; border-radius:8px; margin:4px 0; display:block; }
+  .mvideo { width:100%; }
+  .igembed { width:100%; max-width:400px; height:430px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; }
+  .mloading { font-size:12px; color:#999; padding:4px 0; }
+  .tapnote { font-size:11px; color:#999999; margin-top:4px; }
+  .card.open .tapnote { display:none; }
+  .gridwrap { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+  .tile { border:1px solid #e4e4e7; border-radius:14px; overflow:hidden; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .tile img.flyer { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#f0f0f1; }
+  .tile .tbody { padding:8px; }
+  .tile .title { font-size:13px; margin:2px 0; }
+  .noimg { aspect-ratio:1/1; background:#f0f0f1; display:flex; align-items:center; justify-content:center; color:#999999; font-size:12px; }
+  .lrow { border:1px solid #e4e4e7; border-radius:10px; padding:8px 10px; margin-bottom:6px; background:#ffffff; }
+  .lrowmain { display:flex; gap:10px; align-items:center; cursor:pointer; }
+  .lrow .ltitle { font-weight:700; font-size:14px; }
+  .lrow .lmeta { font-size:12px; color:#444444; }
+  .ldetail { display:none; margin-top:8px; border-top:1px dashed #e4e4e7; padding-top:8px; }
+  .lrow.open .ldetail { display:block; }
+  .tile.open { grid-column:1 / -1; }
+  .tdetail { display:none; padding:0 8px 10px; }
+  .tile.open .tdetail { display:block; }
+  .mgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; max-width:520px; margin:4px 0; }
+  .mgrid .mphoto { width:100%; height:100%; max-width:none; max-height:none; aspect-ratio:1; object-fit:cover; margin:0; }
+  .mgrid .mvideo { grid-column:1 / -1; width:100%; max-width:400px; max-height:300px; margin:0; }
+  .mtext { font-size:13px; color:#27272a; background:#fafafa; border:1px solid #eeeeee; border-radius:8px; padding:8px 10px; margin:4px 0; white-space:pre-wrap; word-break:break-word; max-width:520px; }
+  .mtext .muser { font-weight:700; margin-bottom:2px; }
+  .fstrip { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  .fstrip img { height:84px; border-radius:6px; display:block; background:#f0f0f1; }
+  .gitem { text-align:center; }
+  .gitem img { max-width:140px; max-height:140px; border-radius:8px; display:block; background:#f0f0f1; }
+  .gitem .glabel { font-size:11px; color:#555555; margin:4px 0 2px; }
+  .miss { display:inline-block; font-size:10px; padding:1px 6px; border-radius:999px; border:1px solid #c0392b; color:#c0392b; margin-right:4px; }
+  .calnav { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .calnav .ct { font-weight:700; font-size:15px; }
+  .calnav select { font:inherit; font-size:14px; font-weight:700; padding:5px 6px; border:1px solid #dcdce0; border-radius:8px; background:#fff; }
+  table.cal { width:100%; border-collapse:collapse; table-layout:fixed; }
+  table.cal th { font-size:11px; color:#666666; padding:4px 0; }
+  table.cal td { border:1px solid #dddddd; vertical-align:top; height:86px; padding:3px; font-size:11px; }
+  table.cal td.out { color:#bbbbbb; }
+  table.cal td.today { background:#f7f7f7; }
+  .cev { display:block; background:#111111; color:#ffffff; border-radius:4px; padding:1px 4px; margin-top:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; }
+  .cmore { display:block; color:#666666; margin-top:2px; font-size:10px; }
+  /* レスポンシブ (タブレット) */
+  @media (max-width: 1024px) {
+    .gridwrap { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+    table.cal td { height:76px; }
+  }
+  /* レスポンシブ (スマホ) */
+  @media (max-width: 640px) {
+    main { padding:10px 10px 76px; }
+    header { padding:10px 12px; }
+    header h1 { font-size:16px; }
+    header button { padding:6px 9px; font-size:12px; }
+    .toolbar { padding:10px 10px 4px; border-radius:12px; }
+    .chip { font-size:12px; padding:6px 10px; min-height:34px; }
+    .seg { display:flex; width:100%; }
+    .seg .chip { flex:1; padding:8px 4px; font-size:12px; text-align:center; }
+    #searchBox { font-size:16px; padding:11px 12px; }
+    #sortBtn { margin-left:0; }
+    .filterrow .fsel { flex:1 1 40%; font-size:16px; padding:9px 8px; }
+    .card { padding:10px; border-radius:12px; }
+    .title { font-size:15px; }
+    .meta { font-size:12px; }
+    .carddetail .row button, .carddetail .row .btn { flex:1 1 42%; text-align:center; padding:10px 6px; }
+    .gridwrap { grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:8px; }
+    .tile .title { font-size:12px; }
+    .lrow { padding:8px; }
+    .lrowmain { gap:8px; }
+    .lrowmain > div:first-child { min-width:92px !important; }
+    .lrow .ltitle { font-size:13px; }
+    table.cal td { height:54px; font-size:10px; padding:2px; }
+    table.cal th { font-size:10px; }
+    .cev { font-size:9px; padding:1px 2px; }
+    .calnav .ct { font-size:14px; }
+    .calnav button { padding:6px 9px; font-size:12px; }
+    dialog { width:96vw; padding:14px; }
+    .dtpanel .dtday { width:30px; height:30px; font-size:12px; }
+    #cropHandle { right:-14px; bottom:-14px; width:28px; height:28px; }
+    .fab { right:12px; bottom:12px; padding:12px 16px; font-size:14px; }
+    .msg { bottom:72px; font-size:12px; }
+    input, select, textarea { font-size:16px; }
+  }
+</style>
+</head>
+<body>
+<header style="display:flex;justify-content:space-between;align-items:center;"><h1>出演イベント登録</h1><button onclick="doTestDiscord()">Discord接続テスト</button></header>
+<main>
+ <div class="toolbar">
+  <input id="searchBox" type="search" placeholder="検索：年・年月日・イベント名・会場・ハッシュタグ">
+  <div class="chips" id="sections" style="align-items:center;">
+    <button class="chip on" data-s="upcoming">これからのイベント</button>
+    <button class="chip" data-s="past">開催済み</button>
+    <button id="sortBtn" style="margin-left:auto;">日付順：古い順</button>
+  </div>
+  <div class="filterrow">
+    <div class="seg" id="views">
+      <button class="chip on" data-v="card">カード</button>
+      <button class="chip" data-v="list">リスト</button>
+      <button class="chip" data-v="grid">グリッド</button>
+      <button class="chip" data-v="calendar">カレンダー</button>
+    </div>
+    <select id="statusSel" class="fsel" aria-label="ステータスで絞り込み">
+      <option value="">ステータス：すべて</option>
+      <option value="仮押さえ">仮押さえ</option>
+      <option value="正式決定">正式決定</option>
+      <option value="公開済み">公開済み</option>
+    </select>
+    <select id="missingSel" class="fsel" aria-label="不足データで抽出">
+      <option value="">不足：すべて</option>
+      <option value="any">不足あり</option>
+      <option value="flyer">フライヤーなし</option>
+      <option value="venue">会場なし</option>
+      <option value="pageUrl">URLなし</option>
+      <option value="hashtags">タグなし</option>
+      <option value="time">時刻不明</option>
+      <option value="details">詳細なし</option>
+    </select>
+  </div>
+ </div>
+  <div id="list"><p class="note">読み込み中…</p></div>
+</main>
+<button class="fab" id="newBtn">＋ 新規登録</button>
+<div class="msg" id="msg"></div>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h3 id="dlgTitle" style="margin:4px 0 0;">新規登録</h3>
+    <input type="hidden" id="fId">
+    <label>イベント名（仮押さえの間は空でOK）</label>
+    <input id="fTitle" placeholder="？？？">
+    <label>ステータス</label>
+    <select id="fStatus">
+      <option>仮押さえ</option>
+      <option>正式決定</option>
+      <option>公開済み</option>
+    </select>
+    <label>開始日時</label>
+    <button type="button" class="dtbtn" id="dStartBtn">タップして選択</button>
+    <div class="dtpanel" id="dStartPanel" style="display:none;"></div>
+    <input type="hidden" id="fStart">
+    <label>終了日時</label>
+    <button type="button" class="dtbtn" id="dEndBtn">タップして選択</button>
+    <div class="dtpanel" id="dEndPanel" style="display:none;"></div>
+    <input type="hidden" id="fEnd">
+    <label>会場</label>
+    <input id="fVenue">
+    <label>イベントページリンク</label>
+    <input type="url" id="fUrl" placeholder="https://">
+    <label>ハッシュタグ</label>
+    <div id="fTagsWrap"></div>
+    <button type="button" class="addbtn" onclick="addTagInput('')">＋ タグを追加</button>
+    <label>イベント詳細文</label>
+    <textarea id="fDetails"></textarea>
+    <label>みんなの投稿（来場者がXやInstagramに上げてくれた動画・写真のURL）</label>
+    <div id="fMediaWrap"></div>
+    <button type="button" class="addbtn" onclick="addMediaInput('')">＋ URLを追加</button>
+    <label>情報解禁日（任意）</label>
+    <input type="date" id="fEmbargo">
+    <label>フライヤー画像</label>
+    <div id="flyerDrop">
+      <input type="file" id="fFlyer" accept="image/*">
+      <p class="note">画像ファイルはこの枠の中へのドラッグ&ドロップでも放りこめます。画像を選ぶと、下でDiscord用サムネイル（16:9）の切り抜き範囲を選べます。黒い枠の中がサムネイルになります。枠はドラッグで移動、右下の丸で大きさ変更。</p>
+    </div>
+    <div id="curImgs" style="display:none; margin-top:8px;">
+      <p class="note" style="margin:0 0 6px;">現在登録されている画像です。削除と追加は、その場で保存されます（メイン画像の差し替えと切り抜きは下の枠から）。</p>
+      <div id="flyerGallery" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+      <div id="thumbRow" style="margin-top:8px;"></div>
+      <div style="margin-top:8px;">
+        <button type="button" id="addFlyerBtn">＋ フライヤーを追加</button>
+        <input type="file" id="fFlyerAdd" accept="image/*" multiple style="display:none;">
+        <span class="note">選んだ画像はその場で登録されます</span>
+      </div>
+    </div>
+    <div id="cropWrap">
+      <img id="cropImg" alt="">
+      <div id="cropBox"><div id="cropHandle"></div></div>
+    </div>
+    <div class="warn" id="embargoWarn">情報解禁日より前です。「公開済み」にする前に確認してください。</div>
+    <div class="row" style="margin-top:16px;">
+      <button type="button" class="primary" id="saveBtn">保存する</button>
+      <button type="button" id="cancelBtn">キャンセル</button>
+      <button type="button" id="deleteBtn" style="display:none;">削除</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+// 静的フロントエンド用トランスポート: google.script.run の呼び出しを Worker 経由のAPIに変換する
+var API_BASE = 'https://gekko-events-api.gekkoandmoon.workers.dev';
+function apiKey_() { return localStorage.getItem('gekko_api_key') || ''; }
+function apiCall_(action, fields) {
+  var body = { action: action, key: apiKey_() };
+  if (fields) Object.keys(fields).forEach(function (k) { body[k] = fields[k]; });
+  return fetch(API_BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j && j.ok === false) throw new Error(j.error || 'API error'); return j; });
+}
+var METHOD_MAP_ = {
+  listEventsPage: function (a) { return apiCall_('listPage', a[0] || {}); },
+  listEvents: function () { return apiCall_('list', {}).then(function (j) { return j.events; }); },
+  getEventForEdit: function (a) { return apiCall_('event', { id: a[0] }).then(function (j) { return j.event; }); },
+  createEvent: function (a) { return apiCall_('create', { payload: a[0] }); },
+  updateEvent: function (a) { return apiCall_('update', { id: a[0], payload: a[1] }); },
+  deleteEvent: function (a) { return apiCall_('delete', { id: a[0] }); },
+  syncEventById: function (a) { return apiCall_('sync', { id: a[0] }); },
+  setMediaUrls: function (a) { return apiCall_('setMediaUrls', { id: a[0], text: a[1] }); },
+  getPostMedia: function (a) { return apiCall_('postMedia', { url: a[0] }); },
+  getListImage: function (a) { return apiCall_('image', { id: a[0] }); },
+  addFlyerImage: function (a) { return apiCall_('addFlyerImage', { id: a[0], file: a[1] }); },
+  removeFlyerImage: function (a) { return apiCall_('removeFlyerImage', { id: a[0], fileId: a[1] }); },
+  removeThumbImage: function (a) { return apiCall_('removeThumbImage', { id: a[0] }); },
+  fetchImageData: function (a) { return apiCall_('fetchImageData', { url: a[0] }); }
+};
+function makeRunner_(success, failure) {
+  var runner = {
+    withSuccessHandler: function (fn) { return makeRunner_(fn, failure); },
+    withFailureHandler: function (fn) { return makeRunner_(success, fn); }
+  };
+  return new Proxy(runner, { get: function (t, prop) {
+    if (prop in t) return t[prop];
+    return function () {
+      var args = Array.prototype.slice.call(arguments);
+      var fn = METHOD_MAP_[prop];
+      if (!fn) { if (failure) failure(new Error('unsupported call: ' + prop)); return; }
+      fn(args).then(function (res) { if (success) success(res); }).catch(function (e) { if (failure) failure(e); else console.error(e); });
+    };
+  } });
+}
+window.google = window.google || {};
+google.script = google.script || {};
+google.script.run = makeRunner_(null, null);
+if (!apiKey_()) {
+  var k = window.prompt('合言葉を入力してください（初回のみ）');
+  if (k) localStorage.setItem('gekko_api_key', k.trim());
+}
+</script>
+
+<script>window.INITIAL_PAGE = null;</script>
+<script>
+var EVENTS = [];
+var filter = '';
+var section = 'upcoming';
+var sortDir = { upcoming: 'asc', past: 'desc' };
+var PAGE_SIZE = 10;
+var shownCount = PAGE_SIZE;
+var LAST_PAGE = [];
+var TOTAL_COUNT = 0; // v12: サーバー側の該当件数
+var HAS_MORE = false;
+var crop = { x: 0.05, y: 0.05, w: 0.9 }; // 画像に対する相対座標 (w基準, 16:9)
+var flyerData = null;   // {name, mime, base64} 圧縮済みフライヤー
+var flyerUrl = null;    // ドロップされた画像のURL (ファイルが渡らないドラッグ用)
+var editingThumbKept = false;
+var viewMode = 'card';   // card | list | grid | calendar
+var missingFilter = '';  // '' | any | flyer | venue | pageUrl | hashtags | time | details
+var ALL_EVENTS = null;   // カレンダー・不足抽出用の全件キャッシュ
+var calCursor = null;    // カレンダーの表示月 (その月の1日)
+var searchText = '';     // 検索文字列 (空なら検索なし)
+var OPEN_IDS = {};       // 開いたままにしておくカード (再描画・再読み込みでも維持する)
+var MEDIA_CACHE = {};    // 埋め込み取得結果のキャッシュ (再描画のたびに取り直さない)
+function setPreviewImg(img, fid, w) {
+  img.onerror = function() {
+    img.onerror = null;
+    google.script.run.withSuccessHandler(function(j) {
+      if (j && j.ok) img.src = 'data:' + j.mime + ';base64,' + j.base64;
+    }).getListImage(fid);
+  };
+  img.src = imgUrl(fid, w);
+}
+function detailInner(ev) { return flyerStrip(ev) + syncLine(ev) + mediaSection(ev) + actionRow(ev); }
+function flyerIdsClient(ev) {
+  var ids = String((ev && ev.flyerFileIds) || '').split(/[\s,]+/).filter(function (x) { return x; });
+  if (!ids.length && ev && ev.flyerFileId) ids = [ev.flyerFileId];
+  if (ev && ev.flyerFileId && ids.indexOf(ev.flyerFileId) < 0) ids.unshift(ev.flyerFileId);
+  return ids;
+}
+function flyerStrip(ev) {
+  var ids = flyerIdsClient(ev);
+  if (ids.length < 2) return '';
+  var h = '<div class="lmeta">フライヤー ' + ids.length + '枚</div><div class="fstrip">';
+  ids.forEach(function (fid) { h += '<img loading="lazy" src="' + imgUrl(fid, 300) + '" data-fid="' + fid + '" alt="">'; });
+  return h + '</div>';
+}
+function fillDetail(box) {
+  var det = box.querySelector('.carddetail, .ldetail, .tdetail');
+  if (!det || det.innerHTML) return;
+  var ev = findEvent_(box.getAttribute('data-eid'));
+  if (ev) det.innerHTML = detailInner(ev);
+}
+var FORM_EV = null;      // 編集フォームで開いているイベント (画像ギャラリー管理用)
+function renderFlyerGallery() {
+  var ev = FORM_EV;
+  var wrap = $('flyerGallery');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  var tr = $('thumbRow');
+  tr.innerHTML = '';
+  if (!ev || !ev.id) { $('curImgs').style.display = 'none'; return; }
+  var ids = flyerIdsClient(ev);
+  $('curImgs').style.display = (ids.length || ev.thumbFileId) ? 'block' : 'none';
+  ids.forEach(function (fid, i) {
+    var d = document.createElement('div');
+    d.className = 'gitem';
+    var label = (fid === ev.flyerFileId) ? 'メイン' : ('フライヤー' + (i + 1));
+    d.innerHTML = '<img alt=""><div class="glabel">' + label + '</div><button type="button">削除</button>';
+    setPreviewImg(d.querySelector('img'), fid, 300);
+    d.querySelector('button').onclick = function () { removeFlyer(fid, this); };
+    wrap.appendChild(d);
+  });
+  if (ev.thumbFileId) {
+    tr.innerHTML = '<div class="lmeta">Discord用サムネ</div>' +
+      '<img id="curThumbImg2" style="max-width:200px; border-radius:8px; display:block; margin:4px 0; background:#f0f0f1;" alt="">' +
+      '<button type="button" id="delThumbBtn">サムネを削除</button>';
+    setPreviewImg($('curThumbImg2'), ev.thumbFileId, 400);
+    $('delThumbBtn').onclick = removeThumb;
+  }
+}
+function applyFlyerState(r) {
+  if (!r || !FORM_EV) return;
+  FORM_EV.flyerFileId = r.flyerFileId || '';
+  if (r.thumbFileId !== undefined) FORM_EV.thumbFileId = r.thumbFileId || '';
+  FORM_EV.flyerFileIds = r.flyerFileIds || '';
+  [EVENTS, ALL_EVENTS].forEach(function (arr) {
+    if (!arr) return;
+    arr.forEach(function (e) {
+      if (e.id === FORM_EV.id) {
+        e.flyerFileId = FORM_EV.flyerFileId;
+        e.thumbFileId = FORM_EV.thumbFileId;
+        e.flyerFileIds = FORM_EV.flyerFileIds;
+      }
+    });
+  });
+  renderFlyerGallery();
+}
+function removeFlyer(fid, btn) {
+  if (!FORM_EV || !FORM_EV.id) return;
+  if (!confirm('この画像を削除しますか？（Driveのゴミ箱に移ります）')) return;
+  btn.disabled = true;
+  google.script.run.withSuccessHandler(function (r) {
+    applyFlyerState(r);
+    toast('画像を削除しました');
+    load();
+  }).withFailureHandler(function (e) {
+    btn.disabled = false;
+    toast('削除失敗: ' + e.message, 6000);
+  }).removeFlyerImage(FORM_EV.id, fid);
+}
+function removeThumb() {
+  if (!FORM_EV || !FORM_EV.id) return;
+  if (!confirm('Discord用サムネを削除しますか？（Driveのゴミ箱に移ります）')) return;
+  google.script.run.withSuccessHandler(function (r) {
+    applyFlyerState(r);
+    toast('サムネを削除しました');
+    load();
+  }).withFailureHandler(function (e) { toast('削除失敗: ' + e.message, 6000); }).removeThumbImage(FORM_EV.id);
+}
+function fileToPayload(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    var rawUrl = reader.result;
+    var keepRaw = file.size <= 8 * 1024 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/png');
+    if (keepRaw) { cb({ name: file.name || 'flyer.jpg', mime: file.type, base64: rawUrl.split(',')[1] }); return; }
+    var img = new Image();
+    img.onload = function () {
+      var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var dataUrl = c.toDataURL('image/jpeg', 0.88);
+      cb({ name: 'flyer.jpg', mime: 'image/jpeg', base64: dataUrl.split(',')[1] });
+    };
+    img.onerror = function () { toast('画像を読み込めませんでした: ' + (file.name || ''), 6000); cb(null); };
+    img.src = rawUrl;
+  };
+  reader.onerror = function () { cb(null); };
+  reader.readAsDataURL(file);
+}
+$('addFlyerBtn').onclick = function () { $('fFlyerAdd').click(); };
+$('fFlyerAdd').addEventListener('change', function () {
+  var files = Array.prototype.slice.call(this.files || []);
+  this.value = '';
+  if (!files.length || !FORM_EV || !FORM_EV.id) return;
+  var queue = files.filter(function (f) { return f.type && f.type.indexOf('image/') === 0 && f.size > 0; });
+  if (!queue.length) { toast('画像ファイルがありませんでした'); return; }
+  toast('画像を登録しています…');
+  var next = function () {
+    var f = queue.shift();
+    if (!f) { toast('画像を追加しました'); load(); return; }
+    fileToPayload(f, function (payload) {
+      if (!payload) { next(); return; }
+      google.script.run.withSuccessHandler(function (r) {
+        applyFlyerState(r);
+        next();
+      }).withFailureHandler(function (e) {
+        toast('追加失敗: ' + e.message, 6000);
+        next();
+      }).addFlyerImage(FORM_EV.id, payload);
+    });
+  };
+  next();
+});
+
+function $(id) { return document.getElementById(id); }
+function toast(t, ms) { var m = $('msg'); m.textContent = t; m.style.display = 'block'; setTimeout(function(){ m.style.display='none'; }, ms || 3200); }
+function syncSummary(s) {
+  if (!s) return '保存しました';
+  function t(v, name) {
+    if (v === 'ok') return name + '✓';
+    if (v === 'updated') return name + '（更新✓）';
+    if (v === 'already') return name + '（登録済み）';
+    if (v === 'skip') return name + '（対象外）';
+    if (v === 'embargo') return name + '（解禁日まち）';
+    if (v === 'unset') return name + '（未設定）';
+    return name + '✗';
+  }
+  return '保存しました｜' + t(s.calendar, 'カレンダー') + ' / ' + t(s.discord, 'Discord') + ' / ' + t(s.blogger, 'Blogger');
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function badge(st) { var c = st === '仮押さえ' ? 'b-hold' : (st === '正式決定' ? 'b-conf' : 'b-pub'); return '<span class="badge ' + c + '">' + esc(st) + '</span>'; }
+
+// v12: サーバー側ページング。開いたタブの10件だけ取り、開催済み292件はタブを開くまで取らない。
+// 共有用の原寸フライヤー先読み(prefetchShare)は読み込み直後に走らせない (10件分の原寸を
+// 毎回取るのが重かったため)。共有ボタン押下時に fetchShareFile() で都度取る。
+function load(append) {
+  var el = $('list');
+  // 再読み込みで「探し直し」にならないよう、明示的な画面切替のとき以外はスクロール位置を保持する
+  if (!window._resetScroll) window._pendingScrollY = window.scrollY || 0;
+  window._resetScroll = false;
+  if (!append) { ALL_EVENTS = null; shownCount = PAGE_SIZE; }
+  // v20: 初期表示は doGet が埋め込んだ先頭ページを使い、サーバー往復なしで即表示する
+  if (!append && window.INITIAL_PAGE && section === 'upcoming' && !filter && !searchText && !missingFilter && viewMode === 'card' && sortDir.upcoming === 'asc') {
+    var res0 = window.INITIAL_PAGE;
+    window.INITIAL_PAGE = null;
+    EVENTS = res0.events || [];
+    TOTAL_COUNT = res0.total || EVENTS.length;
+    HAS_MORE = !!res0.hasMore;
+    try { render(); return; } catch (err) { /* 通常の読み込みにフォールバック */ }
+  }
+  if (needsAll()) { loadAll(); return; }
+  if (!append) { EVENTS = []; el.innerHTML = '<p class="note">読み込み中…</p>'; }
+  if (window._loadTimer) clearTimeout(window._loadTimer);
+  window._loadTimer = setTimeout(function() {
+    el.innerHTML = '<p class="note">読み込みが終わりませんでした。</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+  }, 20000);
+  var offset = append ? EVENTS.length : 0;
+  google.script.run.withSuccessHandler(function(res) {
+    if (window._loadTimer) clearTimeout(window._loadTimer);
+    var page = (res && res.events) || [];
+    EVENTS = append ? EVENTS.concat(page) : page;
+    TOTAL_COUNT = (res && res.total) || EVENTS.length;
+    HAS_MORE = !!(res && res.hasMore);
+    try { render(); } catch (err) {
+      el.innerHTML = '<p class="note">表示でエラーが出ました: ' + esc(err.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+    }
+  }).withFailureHandler(function(e) {
+    if (window._loadTimer) clearTimeout(window._loadTimer);
+    el.innerHTML = '<p class="note">読み込み失敗: ' + esc(e.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+  }).listEventsPage({ section: section, status: filter, dir: sortDir[section], offset: offset, limit: PAGE_SIZE });
+}
+
+function needsAll() { return viewMode === 'calendar' || !!missingFilter || !!searchText; }
+
+function loadAll() {
+  var el = $('list');
+  if (ALL_EVENTS) { render(); return; }
+  el.innerHTML = '<p class="note">読み込み中…</p>';
+  google.script.run.withSuccessHandler(function(list) {
+    ALL_EVENTS = list || [];
+    render();
+  }).withFailureHandler(function(e) {
+    el.innerHTML = '<p class="note">読み込み失敗: ' + esc(e.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+  }).listEvents();
+}
+
+function isTimeUnknown(ev) {
+  if (!ev.start || !ev.end) return true;
+  var s = new Date(ev.start), e = new Date(ev.end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return false;
+  return s.getHours() === 0 && s.getMinutes() === 0 && (e - s) === 86400000;
+}
+function missingOf(ev) {
+  var m = [];
+  if (!ev.flyerFileId) m.push(['flyer', 'フライヤーなし']);
+  if (!ev.venue) m.push(['venue', '会場なし']);
+  if (!ev.pageUrl) m.push(['pageUrl', 'URLなし']);
+  if (!ev.hashtags) m.push(['hashtags', 'タグなし']);
+  if (isTimeUnknown(ev)) m.push(['time', '時刻不明']);
+  if (!ev.hasDetails) m.push(['details', '詳細なし']);
+  return m;
+}
+function missTags(ev) {
+  var m = missingOf(ev);
+  if (!m.length) return '';
+  return '<div style="margin-top:4px;">' + m.map(function(x) { return '<span class="miss">' + x[1] + '</span>'; }).join('') + '</div>';
+}
+function searchHaystack(ev) {
+  var d = new Date(ev.start);
+  var dateParts = '';
+  if (!isNaN(d.getTime())) {
+    var y = d.getFullYear(), m = pad2(d.getMonth() + 1), dd = pad2(d.getDate());
+    dateParts = y + '-' + m + '-' + dd + ' ' + y + '-' + m + ' ' + y + ' ' + y + '/' + m + '/' + dd;
+  }
+  return ((ev.title || '') + ' ' + (ev.venue || '') + ' ' + (ev.hashtags || '') + ' ' + (ev.startText || '') + ' ' + dateParts).toLowerCase();
+}
+function clientItems() {
+  var nowMs = new Date().getTime();
+  var terms = searchText ? searchText.toLowerCase().split(/\s+/).filter(function(t) { return !!t; }) : [];
+  var items = (ALL_EVENTS || []).filter(function(ev) {
+    if (filter && ev.status !== filter) return false;
+    if (searchText) {
+      // 検索中はタブ (これから/開催済み) をまたいで全件から探す
+      var hay = searchHaystack(ev);
+      for (var ti = 0; ti < terms.length; ti++) {
+        if (hay.indexOf(terms[ti]) < 0) return false;
+      }
+    } else {
+      var t = new Date(ev.end || ev.start).getTime();
+      var past = !isNaN(t) && t < nowMs;
+      if (section === 'past' ? !past : past) return false;
+    }
+    if (missingFilter === 'any') return missingOf(ev).length > 0;
+    if (missingFilter) return missingOf(ev).some(function(x) { return x[0] === missingFilter; });
+    return true;
+  });
+  var dir = sortDir[section] === 'desc' ? -1 : 1;
+  items.sort(function(a, b) { return (new Date(a.start).getTime() - new Date(b.start).getTime()) * dir; });
+  return items;
+}
+
+function syncLine(ev) {
+  return '<div class="sync">Googleカレンダー: ' + (ev.gcalEventId ? '<b>登録済み</b>' : '未登録') +
+           ' ／ Discord: ' + (ev.discordEventId ? '<b>登録済み</b>' : '未登録') +
+           ' ／ Blogger: ' + (ev.bloggerPosted ? '<b>追記済み</b>' : '未追記') + '</div>';
+}
+function actionRow(ev) {
+  return '<div class="row">' +
+    '<button onclick="openEdit(\'' + ev.id + '\')">編集</button>' +
+    (ev.gcalEventId
+      ? '<button disabled>Googleカレンダー登録済み</button>'
+      : '<button onclick="doSyncCalendar(\'' + ev.id + '\')">Googleカレンダーに登録/更新</button>') +
+    (ev.discordEventId
+      ? '<button disabled>Discord登録済み</button>'
+      : '<button onclick="doSyncDiscord(\'' + ev.id + '\')">Discordに登録</button>') +
+    (ev.bloggerPosted
+      ? '<button disabled>Blogger追記済み</button>'
+      : '<button onclick="doSyncBlogger(\'' + ev.id + '\')">Bloggerに追記</button>') +
+    '<button class="primary" onclick="shareX(\'' + ev.id + '\')">Xに共有</button>' +
+    '<button onclick="shareInstagram(\'' + ev.id + '\')">Instagramに共有</button>' +
+    (ev.pageUrl ? '<a class="btn" href="' + esc(ev.pageUrl) + '" target="_blank" rel="noopener">イベントページ</a>' : '') +
+  '</div>';
+}
+function mediaLabel(url) {
+  if (/x\.com|twitter\.com/.test(url)) return 'Xの投稿';
+  if (/instagram\.com/.test(url)) return 'Instagramの投稿';
+  if (/youtu\.?be/.test(url)) return 'YouTube';
+  if (/tiktok\.com/.test(url)) return 'TikTok';
+  return url;
+}
+function parseUrls(text) {
+  return String(text || '').split(/\s+/).filter(function(u){ return /^https?:\/\//.test(u); });
+}
+function mediaLinksHtml(text, id) {
+  var urls = parseUrls(text);
+  if (!urls.length) return '';
+  return '<div class="medialist"><div class="mhead">みんなの投稿</div>' + urls.map(function(u, i){
+    return '<div class="mrow"><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(mediaLabel(u)) + '</a>' +
+      '<button type="button" class="mdel" title="削除" onclick="removeMedia(this,\'' + id + '\',' + i + ')">×</button>' +
+      '<div class="membed" data-url="' + esc(u) + '"></div></div>';
+  }).join('') + '</div>';
+}
+function mediaSection(ev) {
+  return '<div class="mediaarea">' + mediaLinksHtml(ev.mediaUrls, ev.id) +
+    '<div class="mediaadd"><input class="mqinput" type="url" placeholder="みんなの投稿のURLを貼る">' +
+    '<button type="button" onclick="addMedia(this,\'' + ev.id + '\')">追加</button></div></div>';
+}
+function toggleDetail(box) {
+  if (!box) return;
+  box.classList.toggle('open');
+  var id = box.getAttribute('data-eid');
+  if (id) {
+    if (box.classList.contains('open')) OPEN_IDS[id] = 1; else delete OPEN_IDS[id];
+    saveHashState();
+  }
+  if (box.classList.contains('open')) { fillDetail(box); loadCardMedia(box); }
+}
+function toggleCard(head) { toggleDetail(head.parentNode); }
+function saveHashState() {
+  try {
+    var s = { s: section, q: searchText, o: Object.keys(OPEN_IDS) };
+    history.replaceState(null, '', '#' + encodeURIComponent(JSON.stringify(s)));
+  } catch (e) {}
+}
+function restoreHashState() {
+  try {
+    if (!location.hash || location.hash.length < 2) return;
+    var s = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+    if (s.s === 'past' || s.s === 'upcoming') {
+      section = s.s;
+      document.querySelectorAll('#sections .chip').forEach(function(c) {
+        c.classList.toggle('on', c.getAttribute('data-s') === section);
+      });
+    }
+    if (s.q) { searchText = s.q; $('searchBox').value = s.q; }
+    if (s.o && s.o.length) s.o.forEach(function(id) { OPEN_IDS[id] = 1; });
+  } catch (e) {}
+}
+function loadCardMedia(card) {
+  card.querySelectorAll('.membed').forEach(function(box) {
+    if (box.dataset.loaded) return;
+    box.dataset.loaded = '1';
+    var url = box.dataset.url;
+    if (MEDIA_CACHE[url]) { box.innerHTML = mediaEmbedHtml(MEDIA_CACHE[url]); return; }
+    box.innerHTML = '<div class="mloading">読み込み中…</div>';
+    google.script.run.withSuccessHandler(function(r) {
+      MEDIA_CACHE[url] = r;
+      box.innerHTML = mediaEmbedHtml(r);
+    }).withFailureHandler(function() {
+      box.innerHTML = '';
+    }).getPostMedia(url);
+  });
+}
+function mediaEmbedHtml(r) {
+  if (!r) return '';
+  if (r.kind === 'ig' && r.embedUrl) {
+    return '<iframe class="igembed" src="' + esc(r.embedUrl) + '" loading="lazy" frameborder="0" scrolling="no"></iframe>';
+  }
+  var h = '';
+  if (r.text) {
+    h += '<div class="mtext">' +
+      (r.userName ? '<div class="muser">' + esc(r.userName) + (r.userScreen ? ' @' + esc(r.userScreen) : '') + '</div>' : '') +
+      esc(r.text) + '</div>';
+  }
+  var photos = r.photos || [];
+  if (r.video || photos.length > 1) {
+    h += '<div class="mgrid">';
+    if (r.video) h += '<video class="mvideo" controls playsinline preload="none" poster="' + esc(r.poster || '') + '" src="' + esc(r.video) + '"></video>';
+    photos.forEach(function(p) { h += '<img class="mphoto" loading="lazy" src="' + esc(p) + '" alt="">'; });
+    h += '</div>';
+  } else if (photos.length === 1) {
+    h += '<img class="mphoto" loading="lazy" src="' + esc(photos[0]) + '" alt="">';
+  }
+  return h;
+}
+function findEvent_(id) {
+  return EVENTS.concat(ALL_EVENTS || []).filter(function(e){ return e.id === id; })[0];
+}
+function saveMediaUrls_(id, urls, areaEl) {
+  google.script.run.withSuccessHandler(function(r) {
+    var stored = parseUrls(r && r.mediaUrls);
+    [EVENTS, ALL_EVENTS].forEach(function(arr) {
+      if (!arr) return;
+      arr.forEach(function(e){ if (e.id === id) e.mediaUrls = stored.join('\n'); });
+    });
+    var ev = findEvent_(id);
+    if (areaEl && ev) {
+      areaEl.innerHTML = mediaSection(ev);
+      var box = areaEl.closest('[data-eid]');
+      if (box) loadCardMedia(box);
+    }
+    toast('保存しました');
+  }).withFailureHandler(function(e) {
+    toast('保存失敗: ' + e.message);
+  }).setMediaUrls(id, urls.join('\n'));
+}
+function addMedia(btn, id) {
+  var area = btn.closest('.mediaarea');
+  var url = (area.querySelector('.mqinput').value || '').trim();
+  if (!/^https?:\/\//.test(url)) { toast('URLを入れてください'); return; }
+  var ev = findEvent_(id); if (!ev) return;
+  var urls = parseUrls(ev.mediaUrls);
+  if (urls.indexOf(url) >= 0) { toast('もう登録されています'); return; }
+  urls.push(url);
+  saveMediaUrls_(id, urls, area);
+}
+function removeMedia(btn, id, idx) {
+  var ev = findEvent_(id); if (!ev) return;
+  var urls = parseUrls(ev.mediaUrls);
+  urls.splice(idx, 1);
+  saveMediaUrls_(id, urls, btn.closest('.mediaarea'));
+}
+function cardHtml(ev) {
+  var banner = ev.thumbFileId || ev.listThumbFileId || ev.flyerFileId;
+  return '<div class="card' + (OPEN_IDS[ev.id] ? ' open' : '') + '" data-eid="' + ev.id + '">' +
+    '<div class="cardhead" onclick="toggleCard(this)">' +
+      (banner ? '<img class="flyer banner" src="' + imgUrl(banner, 640) + '" data-fid="' + banner + '" loading="lazy" alt="">' : '') +
+      '<div style="margin-top:8px;">' + badge(ev.status) + '</div>' +
+      '<div class="title">' + esc(ev.title || '？？？') + '</div>' +
+      '<div class="meta">' + esc(ev.startText) + (ev.endText ? ' 〜 ' + esc(ev.endText) : '') + '</div>' +
+      '<div class="meta">' + esc(ev.venue || '') + '</div>' +
+      (missingFilter ? missTags(ev) : '') +
+      '<div class="tapnote">タップで詳細</div>' +
+    '</div>' +
+    '<div class="carddetail">' +
+      (OPEN_IDS[ev.id] ? detailInner(ev) : '') +
+    '</div></div>';
+}
+function listRowHtml(ev) {
+  return '<div class="lrow' + (OPEN_IDS[ev.id] ? ' open' : '') + '" data-eid="' + ev.id + '">' +
+    '<div class="lrowmain" onclick="toggleDetail(this.parentNode)">' +
+    '<div style="min-width:118px;"><div class="lmeta">' + esc(ev.startText || '') + '</div><div>' + badge(ev.status) + '</div></div>' +
+    '<div style="flex:1;min-width:0;"><div class="ltitle">' + esc(ev.title || '？？？') + '</div>' +
+    '<div class="lmeta">' + esc(ev.venue || '') + '</div>' + missTags(ev) +
+    '<div class="tapnote">タップで詳細</div></div>' +
+    '<div><button onclick="event.stopPropagation();openEdit(\'' + ev.id + '\')">編集</button></div></div>' +
+    '<div class="ldetail">' + (OPEN_IDS[ev.id] ? detailInner(ev) : '') + '</div></div>';
+}
+function gridHtml(ev) {
+  var img = ev.listThumbFileId || ev.thumbFileId || ev.flyerFileId;
+  return '<div class="tile' + (OPEN_IDS[ev.id] ? ' open' : '') + '" data-eid="' + ev.id + '">' +
+    '<div class="thead" onclick="toggleDetail(this.parentNode)">' +
+    (img ? '<img class="flyer" src="' + imgUrl(img, 400) + '" data-fid="' + img + '" loading="lazy" alt="">' : '<div class="noimg">画像なし</div>') +
+    '<div class="tbody"><div class="meta">' + esc(ev.startText || '') + '</div>' +
+    '<div class="title">' + esc(ev.title || '？？？') + '</div>' +
+    '<div class="meta">' + esc(ev.venue || '') + '</div>' + missTags(ev) +
+    '<div class="tapnote">タップで詳細</div>' +
+    '<div class="row"><button onclick="event.stopPropagation();openEdit(\'' + ev.id + '\')">編集</button></div></div></div>' +
+    '<div class="tdetail">' + (OPEN_IDS[ev.id] ? detailInner(ev) : '') + '</div></div>';
+}
+
+function render() {
+  var el = $('list');
+  if (viewMode === 'calendar') { renderCalendar(); return; }
+  var items, total, hasMore;
+  if (missingFilter || searchText) {
+    var all = clientItems();
+    total = all.length;
+    items = all.slice(0, shownCount);
+    hasMore = total > items.length;
+  } else {
+    items = EVENTS; total = TOTAL_COUNT; hasMore = HAS_MORE;
+  }
+  if (!items.length) {
+    el.innerHTML = '<p class="note">' + ((missingFilter || searchText)
+      ? '条件に合うイベントはありません。'
+      : (section === 'past'
+        ? '開催済みのイベントはまだありません。'
+        : 'これからのイベントはまだありません。「＋ 新規登録」から追加してください。')) + '</p>';
+    LAST_PAGE = [];
+    return;
+  }
+  LAST_PAGE = items;
+  var body;
+  if (viewMode === 'list') body = items.map(listRowHtml).join('');
+  else if (viewMode === 'grid') body = '<div class="gridwrap">' + items.map(gridHtml).join('') + '</div>';
+  else body = items.map(cardHtml).join('');
+  el.innerHTML = body + (hasMore
+    ? '<div class="row" style="justify-content:center;margin-top:4px;"><button onclick="loadMore()">もっと見る（残り' + (total - items.length) + '件）</button></div>'
+    : '');
+}
+function loadMore() {
+  if (needsAll()) { window._pendingScrollY = window.scrollY || 0; shownCount += PAGE_SIZE; render(); return; }
+  load(true);
+}
+
+function renderCalendar() {
+  var el = $('list');
+  if (!calCursor) { var n = new Date(); calCursor = new Date(n.getFullYear(), n.getMonth(), 1); }
+  var y = calCursor.getFullYear(), mo = calCursor.getMonth();
+  var startDay = new Date(y, mo, 1).getDay();
+  var days = new Date(y, mo + 1, 0).getDate();
+  var byDay = {};
+  (ALL_EVENTS || []).forEach(function(ev) {
+    if (filter && ev.status !== filter) return;
+    var d = new Date(ev.start);
+    if (isNaN(d.getTime()) || d.getFullYear() !== y || d.getMonth() !== mo) return;
+    (byDay[d.getDate()] = byDay[d.getDate()] || []).push(ev);
+  });
+  var today = new Date();
+  // v21: 年・月のプルダウンで遠い月へ直接ジャンプできるようにする
+  var yearSet = {};
+  (ALL_EVENTS || []).forEach(function(ev) {
+    var dd = new Date(ev.start);
+    if (!isNaN(dd.getTime())) yearSet[dd.getFullYear()] = 1;
+  });
+  yearSet[today.getFullYear()] = 1;
+  yearSet[y] = 1;
+  var years = Object.keys(yearSet).map(Number).sort(function(a, b) { return a - b; });
+  var yOpts = years.map(function(yy) { return '<option value="' + yy + '"' + (yy === y ? ' selected' : '') + '>' + yy + '年</option>'; }).join('');
+  var mOpts = '';
+  for (var mm = 0; mm < 12; mm++) mOpts += '<option value="' + mm + '"' + (mm === mo ? ' selected' : '') + '>' + (mm + 1) + '月</option>';
+  var html = '<div class="calnav"><button onclick="moveCal(-12)">« 前年</button><button onclick="moveCal(-1)">‹ 前月</button>' +
+    '<select id="calYearSel" onchange="jumpCal()">' + yOpts + '</select><select id="calMonthSel" onchange="jumpCal()">' + mOpts + '</select>' +
+    '<button onclick="moveCal(1)">翌月 ›</button><button onclick="moveCal(12)">翌年 »</button><button onclick="moveCal(0)">今月</button></div>';
+  html += '<table class="cal"><tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr><tr>';
+  var cell = 0;
+  for (var i = 0; i < startDay; i++) { html += '<td class="out"></td>'; cell++; }
+  for (var d = 1; d <= days; d++) {
+    var evs = (byDay[d] || []).slice().sort(function(a, b) { return new Date(a.start) - new Date(b.start); });
+    var isToday = today.getFullYear() === y && today.getMonth() === mo && today.getDate() === d;
+    html += '<td class="' + (isToday ? 'today' : '') + '"><div>' + d + '</div>';
+    evs.slice(0, 3).forEach(function(ev) {
+      var label = (ev.title || '？？？');
+      if (!isTimeUnknown(ev)) {
+        var sd = new Date(ev.start);
+        label = pad2(sd.getHours()) + ':' + pad2(sd.getMinutes()) + ' ' + label;
+      }
+      html += '<span class="cev" onclick="openEdit(\'' + ev.id + '\')">' + esc(label) + '</span>';
+    });
+    if (evs.length > 3) html += '<span class="cmore">他' + (evs.length - 3) + '件</span>';
+    html += '</td>';
+    cell++;
+    if (cell % 7 === 0 && d < days) html += '</tr><tr>';
+  }
+  while (cell % 7 !== 0) { html += '<td class="out"></td>'; cell++; }
+  html += '</tr></table>';
+  el.innerHTML = html;
+  LAST_PAGE = [];
+}
+function moveCal(delta) {
+  if (delta === 0 || !calCursor) { var n = new Date(); calCursor = new Date(n.getFullYear(), n.getMonth(), 1); }
+  else calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + delta, 1);
+  render();
+}
+function jumpCal() {
+  var ys = $('calYearSel'), ms = $('calMonthSel');
+  if (!ys || !ms) return;
+  calCursor = new Date(parseInt(ys.value, 10), parseInt(ms.value, 10), 1);
+  render();
+}
+
+// 画像は Drive のサムネイルを直接読み込む (高速・並列)。失敗したら GAS 経由にフォールバックする
+function imgUrl(fileId, sz) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + (sz || 1000); }
+
+function hydrateImages() {
+  document.querySelectorAll('img[data-fid]').forEach(function(img) {
+    if (img.dataset.fbk) return;
+    img.dataset.fbk = '1';
+    img.addEventListener('error', function() {
+      var fid = img.getAttribute('data-fid');
+      if (!fid) return;
+      google.script.run.withSuccessHandler(function(j) {
+        if (j && j.ok) img.src = 'data:' + j.mime + ';base64,' + j.base64;
+      }).getListImage(fid);
+    });
+  });
+}
+var _render = render;
+render = function() {
+  _render(); hydrateImages();
+  // 開いていたカードは埋め込みも含めて復元し、保持したスクロール位置に戻す
+  document.querySelectorAll('.card.open, .lrow.open, .tile.open').forEach(function(c) { loadCardMedia(c); });
+  if (window._pendingScrollY != null) {
+    var y = window._pendingScrollY; window._pendingScrollY = null;
+    window.scrollTo(0, y);
+  }
+};
+
+// 共有用に画像を先読みしておく (クリック直後にクリップボードへ書けるように)
+var SHARE_CACHE = {};
+function prefetchShare() {
+  LAST_PAGE.forEach(function(ev) {
+    var imgId = ev.flyerFileId || ev.thumbFileId;
+    if (!imgId || SHARE_CACHE[ev.id]) return;
+    SHARE_CACHE[ev.id] = { loading: true };
+    google.script.run.withSuccessHandler(function(j) {
+      if (!j || !j.ok) { delete SHARE_CACHE[ev.id]; return; }
+      try {
+        var bin = atob(j.base64), arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        var file = new File([arr], j.name || 'flyer.jpg', { type: j.mime || 'image/jpeg' });
+        SHARE_CACHE[ev.id] = { file: file, pngBlob: null };
+        fileToPngBlob(file, function(png) { if (SHARE_CACHE[ev.id]) SHARE_CACHE[ev.id].pngBlob = png; });
+      } catch (e) { delete SHARE_CACHE[ev.id]; }
+    }).withFailureHandler(function() { delete SHARE_CACHE[ev.id]; }).getImageData(imgId);
+  });
+}
+
+// ---------- 新規 / 編集 ----------
+$('newBtn').onclick = function() { openForm(null); };
+$('cancelBtn').onclick = function() { $('dlg').close(); };
+$('statusSel').addEventListener('change', function() { filter = this.value; window._resetScroll = true; load(); });
+$('sections').addEventListener('click', function(e) {
+  if (!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#sections .chip').forEach(function(c){ c.classList.remove('on'); });
+  e.target.classList.add('on');
+  section = e.target.getAttribute('data-s');
+  updateSortBtn();
+  saveHashState();
+  window._resetScroll = true;
+  load();
+});
+function updateSortBtn() {
+  $('sortBtn').textContent = sortDir[section] === 'desc' ? '日付順：新しい順' : '日付順：古い順';
+}
+$('sortBtn').onclick = function() {
+  sortDir[section] = sortDir[section] === 'desc' ? 'asc' : 'desc';
+  updateSortBtn();
+  window._resetScroll = true;
+  load();
+};
+$('views').addEventListener('click', function(e) {
+  if (!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#views .chip').forEach(function(c){ c.classList.remove('on'); });
+  e.target.classList.add('on');
+  viewMode = e.target.getAttribute('data-v');
+  window._resetScroll = true;
+  load();
+});
+$('missingSel').addEventListener('change', function() { missingFilter = this.value; window._resetScroll = true; load(); });
+var _searchTimer = null;
+$('searchBox').addEventListener('input', function() {
+  var v = this.value.trim();
+  if (_searchTimer) clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(function() {
+    searchText = v;
+    saveHashState();
+    // 全件読み込み済みならサーバー往復なしでその場で絞り込む (入力中の再読み込み感をなくす)
+    if (v && ALL_EVENTS) { window._pendingScrollY = window.scrollY || 0; render(); }
+    else load();
+  }, 300);
+});
+
+function openForm(ev) {
+  $('dlgTitle').textContent = ev ? '編集' : '新規登録';
+  $('fId').value = ev ? ev.id : '';
+  $('fTitle').value = ev ? (ev.title || '') : '';
+  $('fStatus').value = ev ? ev.status : '仮押さえ';
+  if (window._pickersReady) {
+    closeAllPanels();
+    setPicker('start', ev ? ev.start : '');
+    setPicker('end', ev ? ev.end : '');
+  }
+  $('fVenue').value = ev ? (ev.venue || '') : '';
+  $('fUrl').value = ev ? (ev.pageUrl || '') : '';
+  buildTagInputs(ev ? ev.hashtags : '');
+  $('fDetails').value = ev ? (ev.details || '') : '';
+  buildMediaInputs(ev ? ev.mediaUrls : '');
+  $('fEmbargo').value = ev && ev.embargoDate ? String(ev.embargoDate).slice(0, 10) : '';
+  $('fFlyer').value = '';
+  flyerData = null;
+  flyerUrl = null;
+  $('cropWrap').style.display = 'none';
+  FORM_EV = ev || null;
+  renderFlyerGallery();
+  $('deleteBtn').style.display = ev ? 'inline-block' : 'none';
+  checkEmbargo();
+  $('dlg').showModal();
+}
+function addTagInput(v) {
+  var row = document.createElement('div');
+  row.className = 'inrow';
+  row.innerHTML = '<input class="tagin" placeholder="#タグ"><button type="button" class="mdel" title="削除" onclick="this.parentNode.remove()">×</button>';
+  row.querySelector('input').value = v || '';
+  $('fTagsWrap').appendChild(row);
+}
+function buildTagInputs(text) {
+  $('fTagsWrap').innerHTML = '';
+  var tags = String(text || '').split(/\s+/).filter(function(t){ return t; });
+  if (!tags.length) tags = [''];
+  tags.forEach(addTagInput);
+}
+function collectTags() {
+  return Array.prototype.map.call(document.querySelectorAll('#fTagsWrap .tagin'), function(i){ return i.value.trim(); })
+    .filter(function(t){ return t; }).join(' ');
+}
+function addMediaInput(v) {
+  var row = document.createElement('div');
+  row.className = 'inrow';
+  row.innerHTML = '<input class="mediain" type="url" placeholder="https://x.com/..."><button type="button" class="mdel" title="削除" onclick="this.parentNode.remove()">×</button>';
+  row.querySelector('input').value = v || '';
+  $('fMediaWrap').appendChild(row);
+}
+function buildMediaInputs(text) {
+  $('fMediaWrap').innerHTML = '';
+  var urls = parseUrls(text);
+  if (!urls.length) urls = [''];
+  urls.forEach(addMediaInput);
+}
+function collectMedia() {
+  return Array.prototype.map.call(document.querySelectorAll('#fMediaWrap .mediain'), function(i){ return i.value.trim(); })
+    .filter(function(u){ return /^https?:\/\//.test(u); }).join('\n');
+}
+function openEdit(id) {
+  var ev = EVENTS.concat(ALL_EVENTS || []).filter(function(e){ return e.id === id; })[0];
+  if (!ev) ev = { id: id };
+  // 一覧データには詳細文などが含まれないため、編集用に全項目を取り直す
+  toast('読み込み中…');
+  google.script.run.withSuccessHandler(function(full) {
+    openForm(full || ev);
+  }).withFailureHandler(function(e) {
+    toast('読み込み失敗: ' + e.message);
+  }).getEventForEdit(id);
+}
+function toLocalInput(v) {
+  if (!v) return '';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v).slice(0, 16);
+  function p(n){ return (n < 10 ? '0' : '') + n; }
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function checkEmbargo() {
+  var st = $('fStatus').value, em = $('fEmbargo').value;
+  var show = st === '公開済み' && em && (new Date(em + 'T00:00:00') > new Date(new Date().toDateString()));
+  $('embargoWarn').style.display = show ? 'block' : 'none';
+}
+$('fStatus').onchange = checkEmbargo;
+$('fEmbargo').onchange = checkEmbargo;
+
+// ---------- 日時ピッカー (カレンダー＋時刻セレクト) ----------
+var pickers = {};
+function initPicker(key, btnId, panelId, hiddenId, defHour) {
+  var now = new Date();
+  var st = { y: now.getFullYear(), m: now.getMonth(), day: null, hour: defHour, min: 0 };
+  st.btn = $(btnId); st.panel = $(panelId); st.hidden = $(hiddenId);
+  pickers[key] = st;
+  st.btn.onclick = function() {
+    var open = st.panel.style.display !== 'none';
+    closeAllPanels();
+    if (!open) { st.panel.style.display = 'block'; renderPicker(key); }
+  };
+}
+function closeAllPanels() {
+  Object.keys(pickers).forEach(function(k) { pickers[k].panel.style.display = 'none'; });
+}
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function hourOptions(sel) {
+  var s = '';
+  for (var i = 0; i < 24; i++) s += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + pad2(i) + '</option>';
+  return s;
+}
+function minuteOptions(sel) {
+  var vals = [];
+  for (var i = 0; i < 60; i += 5) vals.push(i);
+  if (vals.indexOf(sel) < 0) { vals.push(sel); vals.sort(function(a, b) { return a - b; }); }
+  return vals.map(function(i) {
+    return '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + pad2(i) + '</option>';
+  }).join('');
+}
+function renderPicker(key) {
+  var st = pickers[key];
+  var startDay = new Date(st.y, st.m, 1).getDay();
+  var days = new Date(st.y, st.m + 1, 0).getDate();
+  var today = new Date();
+  var yearOpts = '';
+  var baseYear = new Date().getFullYear();
+  var yFrom = 2000, yTo = baseYear + 3;
+  if (st.y < yFrom) yFrom = st.y;
+  if (st.y > yTo) yTo = st.y;
+  for (var yy = yFrom; yy <= yTo; yy++) {
+    yearOpts += '<option value="' + yy + '"' + (yy === st.y ? ' selected' : '') + '>' + yy + '年</option>';
+  }
+  var monthOpts = '';
+  for (var mm = 1; mm <= 12; mm++) {
+    monthOpts += '<option value="' + (mm - 1) + '"' + (mm - 1 === st.m ? ' selected' : '') + '>' + mm + '月</option>';
+  }
+  var html = '<div class="calhead"><button type="button" onclick="moveMonth(\'' + key + '\',-1)">‹</button>' +
+    '<span><select style="width:auto;display:inline-block;" onchange="jumpMonth(\'' + key + '\',\'y\',this.value)">' + yearOpts + '</select>' +
+    '<select style="width:auto;display:inline-block;" onchange="jumpMonth(\'' + key + '\',\'m\',this.value)">' + monthOpts + '</select></span>' +
+    '<button type="button" onclick="moveMonth(\'' + key + '\',1)">›</button></div>';
+  html += '<table><tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr><tr>';
+  var cell = 0;
+  for (var i = 0; i < startDay; i++) { html += '<td></td>'; cell++; }
+  for (var d = 1; d <= days; d++) {
+    var cls = 'dtday' + (st.day === d ? ' sel' : '') +
+      ((today.getFullYear() === st.y && today.getMonth() === st.m && today.getDate() === d) ? ' today' : '');
+    html += '<td><button type="button" class="' + cls + '" onclick="pickDay(\'' + key + '\',' + d + ')">' + d + '</button></td>';
+    cell++;
+    if (cell % 7 === 0 && d < days) html += '</tr><tr>';
+  }
+  html += '</tr></table>';
+  html += '<div class="timerow"><select onchange="pickTime(\'' + key + '\',\'h\',this.value)">' + hourOptions(st.hour) + '</select>時' +
+    '<select onchange="pickTime(\'' + key + '\',\'m\',this.value)">' + minuteOptions(st.min) + '</select>分' +
+    '<button type="button" class="primary" onclick="closeAllPanels()">決定</button></div>';
+  html += '<div class="timerow"><input type="text" id="direct-' + key + '" placeholder="直接入力もOK: 2027/05/10 19:00" style="flex:2;width:auto;">' +
+    '<button type="button" onclick="applyDirect(\'' + key + '\')">反映</button></div>';
+  st.panel.innerHTML = html;
+}
+function moveMonth(key, delta) {
+  var st = pickers[key];
+  var d = new Date(st.y, st.m + delta, 1);
+  st.y = d.getFullYear(); st.m = d.getMonth();
+  renderPicker(key);
+}
+function jumpMonth(key, which, v) {
+  var st = pickers[key];
+  if (which === 'y') st.y = parseInt(v, 10); else st.m = parseInt(v, 10);
+  renderPicker(key);
+}
+function applyDirect(key) {
+  var st = pickers[key];
+  var input = $('direct-' + key);
+  var m = String(input ? input.value : '').match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[\sT]+(\d{1,2}):(\d{2}))?/);
+  if (!m) { toast('日付の形式が読めませんでした（例: 2027/05/10 19:00）'); return; }
+  st.y = parseInt(m[1], 10); st.m = parseInt(m[2], 10) - 1; st.day = parseInt(m[3], 10);
+  if (m[4] != null) { st.hour = parseInt(m[4], 10); st.min = parseInt(m[5], 10); }
+  updatePickerValue(key);
+  renderPicker(key);
+  if (key === 'start') followEnd_();
+}
+function pickDay(key, d) {
+  var st = pickers[key];
+  st.day = d;
+  updatePickerValue(key);
+  renderPicker(key);
+  if (key === 'start') followEnd_();
+}
+/** 開始を決めたら、終了が未設定か開始以前なら終了日を開始日に合わせる (年だけズレる事故防止) */
+function followEnd_() {
+  var st = pickers.start, en = pickers.end;
+  if (!en || st.day == null) return;
+  var s = new Date(st.y, st.m, st.day, st.hour, st.min);
+  var e = en.day == null ? null : new Date(en.y, en.m, en.day, en.hour, en.min);
+  if (!e || e <= s) {
+    en.y = st.y; en.m = st.m; en.day = st.day;
+    updatePickerValue('end');
+  }
+}
+function pickTime(key, which, v) {
+  var st = pickers[key];
+  if (which === 'h') st.hour = parseInt(v, 10); else st.min = parseInt(v, 10);
+  updatePickerValue(key);
+}
+function updatePickerValue(key) {
+  var st = pickers[key];
+  if (st.day == null) { st.hidden.value = ''; st.btn.textContent = 'タップして選択'; return; }
+  st.hidden.value = st.y + '-' + pad2(st.m + 1) + '-' + pad2(st.day) + 'T' + pad2(st.hour) + ':' + pad2(st.min);
+  var wd = ['日', '月', '火', '水', '木', '金', '土'][new Date(st.y, st.m, st.day).getDay()];
+  st.btn.textContent = st.y + '/' + (st.m + 1) + '/' + st.day + ' (' + wd + ') ' + pad2(st.hour) + ':' + pad2(st.min);
+}
+function setPicker(key, value) {
+  var st = pickers[key];
+  if (!st) return;
+  if (!value) { st.day = null; updatePickerValue(key); return; }
+  var d = new Date(value);
+  if (isNaN(d.getTime())) { st.day = null; updatePickerValue(key); return; }
+  st.y = d.getFullYear(); st.m = d.getMonth(); st.day = d.getDate();
+  st.hour = d.getHours(); st.min = d.getMinutes();
+  updatePickerValue(key);
+}
+initPicker('start', 'dStartBtn', 'dStartPanel', 'fStart', 18);
+initPicker('end', 'dEndBtn', 'dEndPanel', 'fEnd', 22);
+window._pickersReady = true;
+
+// ---------- フライヤー読み込みと切り抜き ----------
+function loadFlyerFile(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    var rawUrl = reader.result;
+    // 8MB以下のJPEG/PNGは再圧縮せず、元の画質のまま保持する (共有にもこの原寸を使う)
+    var keepRaw = file.size <= 8 * 1024 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/png');
+    var img = new Image();
+    img.onload = function() {
+      var dataUrl;
+      if (keepRaw) {
+        dataUrl = rawUrl;
+        flyerUrl = null;
+        flyerData = { name: file.name || 'flyer.jpg', mime: file.type, base64: rawUrl.split(',')[1] };
+      } else {
+        // 大きい画像だけ長辺1600pxに圧縮して保持
+        var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        dataUrl = c.toDataURL('image/jpeg', 0.88);
+        flyerUrl = null;
+        flyerData = { name: 'flyer.jpg', mime: 'image/jpeg', base64: dataUrl.split(',')[1] };
+      }
+      $('cropImg').src = dataUrl;
+      crop = { x: 0.05, y: 0.05, w: 0.9 };
+      $('cropWrap').style.display = 'block';
+      requestAnimationFrame(layoutCrop);
+    };
+    img.onerror = function () {
+      toast('画像を読み込めませんでした。画像を一度ダウンロードしてから試してみてください', 6000);
+    };
+    img.src = rawUrl;
+  };
+  reader.onerror = function () {
+    toast('ファイルを読み込めませんでした', 6000);
+  };
+  reader.readAsDataURL(file);
+}
+$('fFlyer').addEventListener('change', function() { loadFlyerFile(this.files && this.files[0]); });
+
+// ---------- フライヤーのドラッグ&ドロップ ----------
+var flyerZone = $('flyerDrop');
+['dragenter', 'dragover'].forEach(function(ev) {
+  flyerZone.addEventListener(ev, function(e) { e.preventDefault(); flyerZone.classList.add('over'); });
+});
+['dragleave', 'drop'].forEach(function(ev) {
+  flyerZone.addEventListener(ev, function(e) { e.preventDefault(); flyerZone.classList.remove('over'); });
+});
+flyerZone.addEventListener('drop', function(e) {
+  var files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length) {
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].type && files[i].type.indexOf('image/') === 0 && files[i].size > 0) { loadFlyerFile(files[i]); return; }
+    }
+  }
+  // 別ウィンドウからのドラッグではファイルが渡らず、画像のURLだけが来ることがある。
+  // リンク付き画像では text/uri-list がリンク先ページのURLになるため、
+  // まず text/html 内の <img src> (画像そのもの) を優先する。
+  var url = '';
+  try {
+    var m = (e.dataTransfer.getData('text/html') || '').match(/<img[^>]+src="([^"]+)"/i);
+    if (m) url = m[1].trim();
+    if (!url) url = (e.dataTransfer.getData('text/uri-list') || '').split('\n')[0].trim();
+    if (!url) {
+      var tp = (e.dataTransfer.getData('text/plain') || '').trim();
+      if (/^https?:\/\/\S+$/i.test(tp)) url = tp;
+    }
+  } catch (err) { /* 取得できない形式だった */ }
+  if (url && /^https?:\/\//i.test(url)) { intakeFlyerUrl(url); return; }
+  toast('画像ファイルが見つかりませんでした');
+});
+
+/** ドロップされたURLを取り込む。Xの投稿URLなら投稿の1枚目の画像に解決する */
+function intakeFlyerUrl(url) {
+  if (/(?:x\.com|twitter\.com)\/[^\/]+\/status\/\d+/.test(url)) {
+    toast('投稿から画像を取り込んでいます…');
+    google.script.run.withSuccessHandler(function (r) {
+      if (r && r.photos && r.photos.length) loadFlyerFromUrl(r.photos[0]);
+      else toast('その投稿から画像を取得できませんでした', 6000);
+    }).withFailureHandler(function () {
+      toast('画像の取得に失敗しました', 6000);
+    }).getPostMedia(url);
+    return;
+  }
+  loadFlyerFromUrl(url);
+}
+
+/** 画像URLをフライヤーとして取り込む。まず通常読み込みを試し、ダメならサーバー経由で取り込む */
+function loadFlyerFromUrl(url) {
+  toast('画像を読み込んでいます…', 2500);
+  var probe = new Image();
+  probe.onload = function () {
+    flyerData = null;
+    flyerUrl = url;
+    $('cropImg').removeAttribute('crossorigin');
+    $('cropImg').onerror = function () { $('cropWrap').style.display = 'none'; };
+    $('cropImg').src = url;
+    crop = { x: 0.05, y: 0.05, w: 0.9 };
+    $('cropWrap').style.display = 'block';
+    requestAnimationFrame(layoutCrop);
+    toast('画像URLを取り込みました。保存すると登録されます');
+  };
+  probe.onerror = function () { fetchFlyerViaServer(url); };
+  probe.src = url;
+}
+
+/** サーバー経由で画像を取り込む (iframe側で直接表示できない画像向けの確実な経路) */
+function fetchFlyerViaServer(url) {
+  toast('サーバー経由で取り込んでいます…', 4000);
+  google.script.run.withSuccessHandler(function (r) {
+    if (!r || !r.base64) { toast('画像を取り込めませんでした', 6000); return; }
+    flyerUrl = null;
+    flyerData = { name: 'flyer.jpg', mime: r.mime || 'image/jpeg', base64: r.base64 };
+    $('cropImg').removeAttribute('crossorigin');
+    $('cropImg').onerror = function () { $('cropWrap').style.display = 'none'; };
+    $('cropImg').src = 'data:' + flyerData.mime + ';base64,' + flyerData.base64;
+    crop = { x: 0.05, y: 0.05, w: 0.9 };
+    $('cropWrap').style.display = 'block';
+    requestAnimationFrame(layoutCrop);
+    toast('画像を取り込みました。保存すると登録されます');
+  }).withFailureHandler(function (e) {
+    toast('画像を取り込めませんでした: ' + e.message + ' / URL: ' + url.slice(0, 90), 10000);
+  }).fetchImageData(url);
+}
+
+/** フライヤーの明るさを見て、切り抜き枠の色を自動で切り替える (黒地では白枠) */
+function autoCropFrameTheme() {
+  var img = $('cropImg');
+  try {
+    var c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, 16, 16);
+    var d = ctx.getImageData(0, 0, 16, 16).data;
+    var sum = 0, n = 0;
+    for (var i = 0; i < d.length; i += 4) { sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255; n++; }
+    $('cropWrap').classList.toggle('light', (sum / n) < 0.45);
+  } catch (e) { /* URL取り込みなど読めない画像では黒枠のまま */ }
+}
+$('cropImg').addEventListener('load', autoCropFrameTheme);
+['dragover', 'drop'].forEach(function(ev) {
+  document.addEventListener(ev, function(e) { e.preventDefault(); });
+});
+
+function layoutCrop() {
+  var wrap = $('cropWrap'), img = $('cropImg'), box = $('cropBox');
+  var W = wrap.clientWidth, H = img.clientHeight;
+  if (!W || !H) return;
+  var bw = crop.w * W;
+  var bh = bw * 9 / 16;
+  if (bh > H) { bh = H; bw = bh * 16 / 9; crop.w = bw / W; }
+  box.style.left = (crop.x * W) + 'px';
+  box.style.top = (crop.y * H) + 'px';
+  box.style.width = bw + 'px';
+  box.style.height = bh + 'px';
+}
+window.addEventListener('resize', layoutCrop);
+
+(function initCropDrag() {
+  var box = $('cropBox'), handle = $('cropHandle'), wrap = $('cropWrap'), img = $('cropImg');
+  var mode = null, sx = 0, sy = 0, start = null;
+  function pos(e) { var t = e.touches ? e.touches[0] : e; return { x: t.clientX, y: t.clientY }; }
+  function down(e, m) { mode = m; var p = pos(e); sx = p.x; sy = p.y; start = { x: crop.x, y: crop.y, w: crop.w }; e.preventDefault(); }
+  box.addEventListener('mousedown', function(e){ if (e.target !== handle) down(e, 'move'); });
+  box.addEventListener('touchstart', function(e){ if (e.target !== handle) down(e, 'move'); }, { passive: false });
+  handle.addEventListener('mousedown', function(e){ down(e, 'resize'); e.stopPropagation(); });
+  handle.addEventListener('touchstart', function(e){ down(e, 'resize'); e.stopPropagation(); }, { passive: false });
+  function move(e) {
+    if (!mode) return;
+    var p = pos(e), W = wrap.clientWidth, H = img.clientHeight;
+    var dx = (p.x - sx) / W, dy = (p.y - sy) / H;
+    if (mode === 'move') {
+      crop.x = Math.min(Math.max(0, start.x + dx), 1 - crop.w);
+      var bh = (crop.w * W * 9 / 16) / H;
+      crop.y = Math.min(Math.max(0, start.y + dy), 1 - bh);
+    } else {
+      crop.w = Math.min(Math.max(0.15, start.w + dx), 1 - start.x);
+      var bh2 = (crop.w * W * 9 / 16) / H;
+      if (bh2 > 1 - crop.y) crop.w = (1 - crop.y) * H / W * 16 / 9;
+    }
+    layoutCrop();
+    e.preventDefault();
+  }
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, { passive: false });
+  document.addEventListener('mouseup', function(){ mode = null; });
+  document.addEventListener('touchend', function(){ mode = null; });
+})();
+
+/** 切り抜き範囲からサムネイル(1280x720 JPEG)を生成 */
+function makeThumb() {
+  return new Promise(function(resolve) {
+    if (!flyerData) { resolve(null); return; }
+    var img = new Image();
+    img.onload = function() {
+      var sx = crop.x * img.width, sy = crop.y * img.height, sw = crop.w * img.width, sh = sw * 9 / 16;
+      var c = document.createElement('canvas');
+      c.width = 1280; c.height = 720;
+      c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, 1280, 720);
+      var dataUrl = c.toDataURL('image/jpeg', 0.88);
+      resolve({ name: 'thumb.jpg', mime: 'image/jpeg', base64: dataUrl.split(',')[1] });
+    };
+    img.src = 'data:' + flyerData.mime + ';base64,' + flyerData.base64;
+  });
+}
+
+/** 一覧表示用の小さいサムネイル (幅1000px) をフライヤーから生成する */
+function makeListThumb() {
+  return new Promise(function(resolve) {
+    if (!flyerData) { resolve(null); return; }
+    var img = new Image();
+    img.onload = function() {
+      var scale = Math.min(1, 1000 / img.width);
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var dataUrl = c.toDataURL('image/jpeg', 0.8);
+      resolve({ name: 'listthumb.jpg', mime: 'image/jpeg', base64: dataUrl.split(',')[1] });
+    };
+    img.onerror = function() { resolve(null); };
+    img.src = 'data:' + flyerData.mime + ';base64,' + flyerData.base64;
+  });
+}
+
+// ---------- 保存 / 削除 ----------
+$('saveBtn').onclick = function() {
+  if (!$('fStart').value || !$('fEnd').value) { toast('開始と終了の日時を入れてください'); return; }
+  if (new Date($('fEnd').value) <= new Date($('fStart').value)) { toast('終了日時が開始日時より前になっています。日時を確認してください'); return; }
+  var btn = this; btn.disabled = true;
+  Promise.all([makeThumb(), makeListThumb()]).then(function(res) {
+    var thumb = res[0];
+    var payload = {
+      title: $('fTitle').value.trim(),
+      status: $('fStatus').value,
+      start: $('fStart').value,
+      end: $('fEnd').value,
+      venue: $('fVenue').value.trim(),
+      pageUrl: $('fUrl').value.trim(),
+      hashtags: collectTags(),
+      details: $('fDetails').value,
+      mediaUrls: collectMedia(),
+      embargoDate: $('fEmbargo').value,
+      flyer: flyerData,
+      flyerUrl: flyerData ? null : flyerUrl,
+      thumb: thumb,
+      listThumb: res[1],
+      skipSync: true
+    };
+    var id = $('fId').value;
+    // UIは先に閉じて操作を返し、保存と連携は後ろで進める (結果はトーストで知らせる)
+    $('dlg').close();
+    toast('保存しています…', 2500);
+    var done = function(r) {
+      btn.disabled = false;
+      if (r && r.flyerError) toast('保存しました（画像URLは取得できませんでした: ' + r.flyerError + '）', 6000);
+      else toast('保存しました');
+      load();
+      // 連携 (カレンダー/Discord/Blogger) は後追いで実行し、保存自体は待たせない
+      var sid = (r && r.id) || id;
+      if (sid) {
+        google.script.run.withSuccessHandler(function(rr) {
+          toast(syncSummary(rr && rr.sync), 6000);
+          load();
+        }).withFailureHandler(function() {
+          toast('連携は定期チェックで自動的に行われます');
+        }).syncEventById(sid);
+      }
+    };
+    var fail = function(e) { btn.disabled = false; toast('保存失敗: ' + e.message, 8000); };
+    if (id) google.script.run.withSuccessHandler(done).withFailureHandler(fail).updateEvent(id, payload);
+    else google.script.run.withSuccessHandler(done).withFailureHandler(fail).createEvent(payload);
+  });
+};
+$('deleteBtn').onclick = function() {
+  var id = $('fId').value;
+  if (!id || !confirm('このイベントを削除しますか？')) return;
+  $('dlg').close();
+  toast('削除しています…', 2500);
+  google.script.run.withSuccessHandler(function() {
+    toast('削除しました'); load();
+  }).withFailureHandler(function(e){ toast('削除失敗: ' + e.message, 8000); }).deleteEvent(id);
+};
+
+// ---------- 連携 ----------
+function doSyncCalendar(id) {
+  toast('Googleカレンダーに登録中…');
+  google.script.run.withSuccessHandler(function(r) {
+    toast('カレンダーに「' + r.title + '」で登録しました'); load();
+  }).withFailureHandler(function(e) { toast('カレンダー登録失敗: ' + e.message); }).syncCalendar(id);
+}
+function doSyncDiscord(id) {
+  toast('Discordに登録中…');
+  google.script.run.withSuccessHandler(function(r) {
+    toast(r && r.imageAttached === false
+      ? 'Discordにイベントを作成しました（カバー画像だけ失敗したので画像なしです）'
+      : 'Discordにイベントを作成しました');
+    load();
+  }).withFailureHandler(function(e) { toast('Discord登録失敗: ' + e.message); }).syncDiscord(id);
+}
+function doTestDiscord() {
+  toast('Discord接続テスト中…');
+  google.script.run.withSuccessHandler(function(r) {
+    alert('Discord接続テスト\nHTTP ' + r.code + '\n' + r.body);
+  }).withFailureHandler(function(e) { alert('接続テスト失敗: ' + e.message); }).testDiscord();
+}
+function doSyncBlogger(id) {
+  toast('Bloggerに追記中…');
+  google.script.run.withSuccessHandler(function() {
+    toast('Bloggerの出演履歴に追記しました'); load();
+  }).withFailureHandler(function(e) { toast('Blogger追記失敗: ' + e.message); }).syncBlogger(id);
+}
+
+// ---------- SNS共有 ----------
+/** 日時を「2026/11/21 (Sat) 18:00〜22:00」形式に (同日なら終了は時刻だけ) */
+function fmtRange(ev) {
+  var s = new Date(ev.start), e = new Date(ev.end);
+  if (isNaN(s.getTime())) return ev.startText || '';
+  var wd = ['日', '月', '火', '水', '木', '金', '土'];
+  function p(n) { return (n < 10 ? '0' : '') + n; }
+  var out = s.getFullYear() + '/' + (s.getMonth() + 1) + '/' + s.getDate() +
+    ' (' + wd[s.getDay()] + ') ' + p(s.getHours()) + ':' + p(s.getMinutes());
+  if (!isNaN(e.getTime())) {
+    if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth() && s.getDate() === e.getDate()) {
+      out += '〜' + p(e.getHours()) + ':' + p(e.getMinutes());
+    } else {
+      out += ' 〜 ' + (e.getMonth() + 1) + '/' + e.getDate() + ' (' + wd[e.getDay()] + ') ' +
+        p(e.getHours()) + ':' + p(e.getMinutes());
+    }
+  }
+  return out;
+}
+/** 告知文: イベント名 / 日時・場所 / URL / ハッシュタグ を各行に */
+function shareText(ev) {
+  var lines = [];
+  lines.push(ev.title || '');
+  lines.push(fmtRange(ev));
+  if (ev.venue) lines.push(ev.venue);
+  if (ev.pageUrl) lines.push(ev.pageUrl);
+  if (ev.hashtags) lines.push(ev.hashtags);
+  return lines.join('\n');
+}
+/** フライヤー画像を File として取得 (無ければサムネ、それも無ければ null) */
+function fetchShareFile(ev, cb) {
+  var imgId = ev.flyerFileId || ev.thumbFileId;
+  if (!imgId) { cb(null); return; }
+  google.script.run.withSuccessHandler(function(j) {
+    if (!j || !j.ok) { cb(null); return; }
+    try {
+      var bin = atob(j.base64), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      cb(new File([arr], j.name || 'flyer.jpg', { type: j.mime || 'image/jpeg' }));
+    } catch (e) { cb(null); }
+  }).withFailureHandler(function() { cb(null); }).getImageData(imgId);
+}
+function downloadFile(file) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = file.name || 'flyer.jpg';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+/** 画像FileをPNG Blobに変換 (クリップボード貼り付け用) */
+function fileToPngBlob(file, cb) {
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function() {
+    try {
+      var c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      c.getContext('2d').drawImage(img, 0, 0);
+      if (c.toBlob) c.toBlob(function(b) { URL.revokeObjectURL(url); cb(b); }, 'image/png');
+      else { URL.revokeObjectURL(url); cb(null); }
+    } catch (e) { URL.revokeObjectURL(url); cb(null); }
+  };
+  img.onerror = function() { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+function shareX(id) {
+  var ev = EVENTS.concat(ALL_EVENTS || []).filter(function(e){ return e.id === id; })[0];
+  if (!ev) return;
+  var text = shareText(ev);
+  var cached = SHARE_CACHE[id];
+  var cachedFile = cached && cached.file ? cached.file : null;
+  // モバイルは共有シートが一番確実 (Xアプリの投稿画面に画像+文面が入る)
+  var isMobile = /iPhone|iPad|Android/.test(navigator.userAgent || '');
+  if (isMobile && cachedFile && navigator.canShare && navigator.canShare({ files: [cachedFile] })) {
+    navigator.share({ files: [cachedFile], text: text }).catch(function(){});
+    return;
+  }
+  var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
+  // 先に別ウィンドウを開いておく (ポップアップブロック回避)。文面はURLで渡す
+  var win = window.open('', '_blank');
+  function go() { if (win) win.location = url; else window.open(url, '_blank'); }
+  function withFile(file) {
+    if (file && navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+      var usePng = function(png) {
+        if (png) {
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]).then(function() {
+            go();
+            toast('Xの投稿画面を開きました。画像はそのまま貼り付け（ペースト）できます');
+          }).catch(function() {
+            downloadFile(file); go();
+            toast('Xの投稿画面を開きました。画像はダウンロードしたフライヤーを添付してください');
+          });
+        } else { downloadFile(file); go(); }
+      };
+      if (cached && cached.file === file && cached.pngBlob) usePng(cached.pngBlob);
+      else fileToPngBlob(file, usePng);
+    } else if (file) {
+      downloadFile(file); go();
+      toast('Xの投稿画面を開きました。画像はダウンロードしたフライヤーを添付してください');
+    } else go();
+  }
+  if (cachedFile) withFile(cachedFile);
+  else fetchShareFile(ev, withFile);
+}
+function shareInstagram(id) {
+  var ev = EVENTS.concat(ALL_EVENTS || []).filter(function(e){ return e.id === id; })[0];
+  if (!ev) return;
+  var text = shareText(ev);
+  var copied = false;
+  var copyDone = (navigator.clipboard && navigator.clipboard.writeText)
+    ? navigator.clipboard.writeText(text).then(function() { copied = true; }).catch(function() {})
+    : Promise.resolve();
+  copyDone.then(function() {
+    var cached = SHARE_CACHE[id];
+    var startShare = function(file) {
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        // 画像つきで共有シートを開く (Instagramを選ぶと投稿/ストーリーズが選べる)
+        if (copied) toast('文面はコピー済みです。Instagramで貼り付けてください');
+        navigator.share({ files: [file] }).catch(function(){});
+      } else {
+        if (file) downloadFile(file);
+        window.open('https://www.instagram.com/', '_blank');
+        toast('画像をダウンロードしました。Instagramアプリから投稿してください' + (copied ? '（文面はコピー済み）' : ''));
+      }
+    };
+    if (cached && cached.file) startShare(cached.file); else fetchShareFile(ev, startShare);
+  });
+}
+
+restoreHashState();
+updateSortBtn();
+load();
+</script>
+</body>
+</html>

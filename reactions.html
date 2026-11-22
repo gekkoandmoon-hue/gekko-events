@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>みんなの反応 | gekko</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; background: #fafafa; color: #222; }
+  header { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid #e5e5e5; padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: #888; font-size: 12px; }
+  button { font: inherit; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 7px 16px; }
+  button.primary { background: #FF2E88; border-color: #FF2E88; color: #fff; font-weight: 700; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .embed { padding: 10px; }
+  .mtext { background: #f6f6f6; border-radius: 10px; padding: 8px 10px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }
+  .mtext .who { font-weight: 700; margin-bottom: 2px; }
+  .mtext .who span { color: #888; font-weight: 400; }
+  .mgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .mgrid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
+  .mphoto { width: 100%; max-height: 340px; object-fit: cover; border-radius: 8px; display: block; }
+  .mvideo { width: 100%; border-radius: 8px; display: block; background: #000; }
+  .igembed { width: 100%; height: 430px; border: 0; border-radius: 8px; }
+  .plink { font-size: 13px; color: #FF2E88; word-break: break-all; }
+  .evinfo { border-top: 1px solid #eee; padding: 10px 12px; margin-top: auto; }
+  .evinfo .t { font-weight: 700; font-size: 14px; }
+  .evinfo .d { color: #666; font-size: 12px; margin-top: 2px; }
+  .evinfo a { display: inline-block; margin-top: 6px; font-size: 12px; color: #FF2E88; text-decoration: none; font-weight: 700; }
+  .msg { text-align: center; color: #888; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>みんなの反応</h1>
+  <span class="sub" id="count"></span>
+  <span style="flex:1"></span>
+  <button class="primary" id="shuffleBtn">シャッフル</button>
+</header>
+<main>
+  <div class="msg" id="msg">読み込んでいます…</div>
+  <div class="grid" id="grid"></div>
+</main>
+<script>
+var API_BASE = 'https://gekko-events-api.gekkoandmoon.workers.dev';
+var ITEMS = [];
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function apiGet(params) {
+  var qs = Object.keys(params).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+  return fetch(API_BASE + '?' + qs).then(function (r) { return r.json(); });
+}
+function shuffleArr(a) {
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function embedHtml(m, url) {
+  if (!m) return '<a class="plink" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>';
+  if (m.kind === 'ig') return '<iframe class="igembed" src="' + esc(m.embedUrl) + '" loading="lazy"></iframe>';
+  if (m.kind === 'x') {
+    var h = '';
+    if (m.text) h += '<div class="mtext"><div class="who">' + esc(m.userName) + ' <span>@' + esc(m.userScreen) + '</span></div>' + esc(m.text) + '</div>';
+    var photos = m.photos || [];
+    if (photos.length === 1) h += '<img class="mphoto" src="' + esc(photos[0]) + '" loading="lazy">';
+    else if (photos.length > 1) h += '<div class="mgrid">' + photos.map(function (p) { return '<img src="' + esc(p) + '" loading="lazy">'; }).join('') + '</div>';
+    if (m.video) h += '<video class="mvideo" src="' + esc(m.video) + '" poster="' + esc(m.poster || '') + '" controls playsinline preload="none"></video>';
+    if (!h) h = '<a class="plink" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>';
+    return h;
+  }
+  return '<a class="plink" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>';
+}
+function render() {
+  var grid = document.getElementById('grid');
+  grid.innerHTML = ITEMS.map(function (it, i) {
+    return '<div class="card"><div class="embed" id="emb' + i + '"><span class="plink">' + esc(it.url) + '</span></div>' +
+      '<div class="evinfo"><div class="t">' + esc(it.ev.title) + '</div>' +
+      '<div class="d">' + esc(it.ev.startText || '') + (it.ev.venue ? ' / ' + esc(it.ev.venue) : '') + '</div>' +
+      '<a href="index.html#event=' + encodeURIComponent(it.ev.id) + '">このイベントを見る →</a></div></div>';
+  }).join('');
+  ITEMS.forEach(function (it, i) {
+    apiGet({ action: 'postMedia', url: it.url }).then(function (m) {
+      var el = document.getElementById('emb' + i);
+      if (el) el.innerHTML = embedHtml(m, it.url);
+    }).catch(function () { /* リンク表示のまま */ });
+  });
+}
+function load() {
+  apiGet({ action: 'reactions' }).then(function (r) {
+    if (!r || !r.ok) throw new Error('load failed');
+    ITEMS = [];
+    (r.events || []).forEach(function (ev) {
+      String(ev.mediaUrls || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (u) {
+        ITEMS.push({ ev: ev, url: u });
+      });
+    });
+    document.getElementById('count').textContent = ITEMS.length + '件の反応 / ' + (r.events || []).length + 'イベント';
+    document.getElementById('msg').style.display = ITEMS.length ? 'none' : 'block';
+    if (!ITEMS.length) document.getElementById('msg').textContent = 'まだ反応が登録されていません';
+    render();
+  }).catch(function () {
+    document.getElementById('msg').textContent = '読み込みに失敗しました。時間をおいて再読み込みしてください';
+  });
+}
+document.getElementById('shuffleBtn').addEventListener('click', function () { shuffleArr(ITEMS); render(); });
+load();
+</script>
+</body>
+</html>
