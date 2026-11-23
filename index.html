@@ -9,7 +9,7 @@
   body { margin:0; font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f5f5f6; color:#1a1a1a; }
   header { padding:12px 16px; background:#ffffff; border-bottom:1px solid #e4e4e7; position:sticky; top:0; z-index:5; }
   header h1 { margin:0; font-size:17px; font-weight:700; letter-spacing:.02em; }
-  main { padding:16px 16px 80px; max-width:860px; margin:0 auto; }
+  main { padding:16px 16px 80px; max-width:1500px; margin:0 auto; }
   .toolbar { background:#ffffff; border:1px solid #e4e4e7; border-radius:14px; padding:12px 14px 6px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; align-items:center; }
   .chip { padding:6px 12px; border-radius:999px; border:1px solid #dcdce0; background:#ffffff; color:#333333; cursor:pointer; font-size:13px; }
@@ -24,6 +24,9 @@
   #searchBox { width:100%; padding:10px 12px; border:1px solid #dcdce0; border-radius:10px; font-size:14px; background:#fafafa; }
   #searchBox:focus { outline:none; border-color:#111111; background:#ffffff; }
   .card { background:#ffffff; border:1px solid #e4e4e7; border-radius:14px; padding:12px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .cardgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr)); gap:12px; margin-bottom:12px; }
+  .cardgrid .card { margin-bottom:0; }
+  .cardgrid .card.open { grid-column:1 / -1; }
   .card img.flyer { width:100%; border-radius:10px; display:block; }
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-right:6px; border:1px solid #dcdce0; color:#333333; background:#ffffff; }
   .b-hold { border-style:dashed; }
@@ -691,7 +694,11 @@ function isTimeUnknown(ev) {
 }
 function missingOf(ev) {
   var m = [];
-  if (!ev.flyerFileId) m.push(['flyer', 'フライヤーなし']);
+  if (!flyerIdsClient(ev).length) {
+    // 原画はないがサムネ類だけ残っている場合は区別して表示する (旧画面の取り込み失敗で発生)
+    if (ev.thumbFileId || ev.listThumbFileId) m.push(['flyer', 'フライヤー原画なし']);
+    else m.push(['flyer', 'フライヤーなし']);
+  }
   if (!ev.venue) m.push(['venue', '会場なし']);
   if (!ev.pageUrl) m.push(['pageUrl', 'URLなし']);
   if (!ev.hashtags) m.push(['hashtags', 'タグなし']);
@@ -954,7 +961,7 @@ function render() {
   var body;
   if (viewMode === 'list') body = items.map(listRowHtml).join('');
   else if (viewMode === 'grid') body = '<div class="gridwrap">' + items.map(gridHtml).join('') + '</div>';
-  else body = items.map(cardHtml).join('');
+  else body = '<div class="cardgrid">' + items.map(cardHtml).join('') + '</div>';
   el.innerHTML = body + pagerHtml(total);
 }
 
