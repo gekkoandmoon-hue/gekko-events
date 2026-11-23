@@ -36,7 +36,12 @@
 <header>
   <h1>みんなの反応</h1>
   <span class="sub" id="count"></span>
-  <span style="flex:1"></span>
+  <input id="q" type="search" placeholder="イベント名・会場で検索" style="font:inherit;border:1px solid #ddd;border-radius:999px;padding:7px 14px;background:#fff;flex:1;min-width:150px;">
+  <select id="sortSel" aria-label="並び順" style="font:inherit;border:1px solid #ddd;border-radius:999px;padding:7px 10px;background:#fff;">
+    <option value="desc">開催日が新しい順</option>
+    <option value="asc">開催日が古い順</option>
+    <option value="random">ランダム</option>
+  </select>
   <select id="sizeSel" aria-label="1ページの表示件数" style="font:inherit;border:1px solid #ddd;border-radius:999px;padding:7px 10px;background:#fff;">
     <option value="10">10件</option>
     <option value="30">30件</option>
@@ -44,6 +49,7 @@
   <button class="primary" id="shuffleBtn">シャッフル</button>
 </header>
 <main>
+  <div id="filternote" style="display:none;background:#fff;border:1px solid #ffd3e8;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px;"></div>
   <div class="msg" id="msg">読み込んでいます…</div>
   <div class="grid" id="grid"></div>
   <div id="pager" style="text-align:center;padding:18px 0 6px;"></div>
@@ -51,6 +57,18 @@
 <script>
 var API_BASE = 'https://gekko-events-api.gekkoandmoon.workers.dev';
 var ITEMS = [];
+var ALL_ITEMS = [];
+var EV_COUNT = 0;
+var QUERY = '';
+var EVENT_ID = '';
+var SORT = 'desc';
+try { SORT = localStorage.getItem('gekko_rp_sort') || 'desc'; } catch (e) {}
+if (SORT !== 'asc' && SORT !== 'random') SORT = 'desc';
+try {
+  var _params = new URLSearchParams(location.search);
+  QUERY = _params.get('q') || '';
+  EVENT_ID = _params.get('event') || '';
+} catch (e) {}
 var RP_SIZE = 30;
 try { RP_SIZE = parseInt(localStorage.getItem('gekko_rp_size') || '30', 10) || 30; } catch (e) {}
 var RP_PAGE = 1;
@@ -116,16 +134,51 @@ function render() {
   document.getElementById('pgPrev').addEventListener('click', function () { if (RP_PAGE > 1) { RP_PAGE--; window.scrollTo(0, 0); render(); } });
   document.getElementById('pgNext').addEventListener('click', function () { if (RP_PAGE < pages) { RP_PAGE++; window.scrollTo(0, 0); render(); } });
 }
+function rebuild() {
+  var q = QUERY.trim().toLowerCase();
+  ITEMS = ALL_ITEMS.filter(function (it) {
+    if (EVENT_ID && it.ev.id !== EVENT_ID) return false;
+    if (!q) return true;
+    var hay = (it.ev.title + ' ' + (it.ev.venue || '') + ' ' + (it.ev.startText || '')).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  });
+  if (SORT === 'random') shuffleArr(ITEMS);
+  else ITEMS.sort(function (a, b) {
+    var d = new Date(a.ev.start).getTime() - new Date(b.ev.start).getTime();
+    return SORT === 'asc' ? d : -d;
+  });
+  var filtered = !!(EVENT_ID || q);
+  document.getElementById('count').textContent = ITEMS.length + '件の反応' + (filtered ? '（全' + ALL_ITEMS.length + '件中）' : '') + ' / ' + EV_COUNT + 'イベント';
+  var note = document.getElementById('filternote');
+  if (EVENT_ID) {
+    var t = '';
+    for (var i = 0; i < ALL_ITEMS.length; i++) { if (ALL_ITEMS[i].ev.id === EVENT_ID) { t = ALL_ITEMS[i].ev.title; break; } }
+    note.innerHTML = '「' + esc(t || 'このイベント') + '」の反応だけ表示中　<button id="clearEv" style="padding:3px 10px;font-size:12px;">絞り込みを解除</button>';
+    note.style.display = 'block';
+    document.getElementById('clearEv').addEventListener('click', function () {
+      EVENT_ID = '';
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      RP_PAGE = 1;
+      rebuild(); render();
+    });
+  } else {
+    note.style.display = 'none';
+    note.innerHTML = '';
+  }
+  var msg = document.getElementById('msg');
+  if (!ALL_ITEMS.length) { msg.style.display = 'block'; msg.textContent = 'まだ反応が登録されていません'; }
+  else if (!ITEMS.length) { msg.style.display = 'block'; msg.textContent = '条件に合う反応がありません'; }
+  else msg.style.display = 'none';
+}
 function applyData_(r) {
-  ITEMS = [];
+  ALL_ITEMS = [];
+  EV_COUNT = (r.events || []).length;
   (r.events || []).forEach(function (ev) {
     String(ev.mediaUrls || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (u) {
-      ITEMS.push({ ev: ev, url: u });
+      ALL_ITEMS.push({ ev: ev, url: u });
     });
   });
-  document.getElementById('count').textContent = ITEMS.length + '件の反応 / ' + (r.events || []).length + 'イベント';
-  document.getElementById('msg').style.display = ITEMS.length ? 'none' : 'block';
-  if (!ITEMS.length) document.getElementById('msg').textContent = 'まだ反応が登録されていません';
+  rebuild();
   render();
 }
 function load() {
@@ -141,8 +194,25 @@ function load() {
     if (!cached) document.getElementById('msg').textContent = '読み込みに失敗しました。時間をおいて再読み込みしてください';
   });
 }
-document.getElementById('shuffleBtn').addEventListener('click', function () { shuffleArr(ITEMS); RP_PAGE = 1; render(); });
+document.getElementById('shuffleBtn').addEventListener('click', function () {
+  SORT = 'random';
+  document.getElementById('sortSel').value = 'random';
+  try { localStorage.setItem('gekko_rp_sort', 'random'); } catch (e) {}
+  RP_PAGE = 1;
+  rebuild(); render();
+});
 (function () {
+  var qEl = document.getElementById('q');
+  qEl.value = QUERY;
+  qEl.addEventListener('input', function () { QUERY = this.value; RP_PAGE = 1; rebuild(); render(); });
+  var sortSel = document.getElementById('sortSel');
+  sortSel.value = SORT;
+  sortSel.addEventListener('change', function () {
+    SORT = this.value;
+    try { localStorage.setItem('gekko_rp_sort', SORT); } catch (e) {}
+    RP_PAGE = 1;
+    rebuild(); render();
+  });
   var sel = document.getElementById('sizeSel');
   sel.value = String(RP_SIZE);
   sel.addEventListener('change', function () {
