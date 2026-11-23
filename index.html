@@ -1399,28 +1399,64 @@ var flyerZone = $('flyerDrop');
 ['dragleave', 'drop'].forEach(function(ev) {
   flyerZone.addEventListener(ev, function(e) { e.preventDefault(); flyerZone.classList.remove('over'); });
 });
-flyerZone.addEventListener('drop', function(e) {
-  var files = e.dataTransfer && e.dataTransfer.files;
+function extractDropUrl_(dt) {
+  var html = '';
+  try { html = dt.getData('text/html') || ''; } catch (e) {}
+  if (html) {
+    var tags = html.match(/<img[^>]+src=["'][^"']+["']/gi) || [];
+    var srcs = [];
+    tags.forEach(function (t) {
+      var m = t.match(/src=["']([^"']+)["']/i);
+      if (m) srcs.push(m[1].replace(/&amp;/g, '&').trim());
+    });
+    var pick = '';
+    for (var i = 0; i < srcs.length; i++) { if (/pbs\.twimg\.com\/media\//.test(srcs[i])) { pick = srcs[i]; break; } }
+    if (!pick) for (var j = 0; j < srcs.length; j++) { if (!/(\/emoji\/|profile_images|abs\.twimg\.com)/.test(srcs[j])) { pick = srcs[j]; break; } }
+    if (!pick && srcs.length) pick = srcs[0];
+    if (pick) return pick;
+  }
+  try { var u = (dt.getData('text/uri-list') || '').split('\n')[0].trim(); if (u) return u.replace(/&amp;/g, '&'); } catch (e) {}
+  try { var tp = (dt.getData('text/plain') || '').trim(); if (/^https?:\/\/\S+$/i.test(tp)) return tp; } catch (e) {}
+  return '';
+}
+function handleDropData_(dt) {
+  if (!dt) return false;
+  var files = dt.files;
   if (files && files.length) {
     for (var i = 0; i < files.length; i++) {
-      if (files[i].type && files[i].type.indexOf('image/') === 0 && files[i].size > 0) { loadFlyerFile(files[i]); return; }
+      if (files[i].type && files[i].type.indexOf('image/') === 0 && files[i].size > 0) { loadFlyerFile(files[i]); return true; }
     }
   }
-  // 別ウィンドウからのドラッグではファイルが渡らず、画像のURLだけが来ることがある。
-  // リンク付き画像では text/uri-list がリンク先ページのURLになるため、
-  // まず text/html 内の <img src> (画像そのもの) を優先する。
-  var url = '';
-  try {
-    var m = (e.dataTransfer.getData('text/html') || '').match(/<img[^>]+src="([^"]+)"/i);
-    if (m) url = m[1].trim().replace(/&amp;/g, '&');
-    if (!url) url = (e.dataTransfer.getData('text/uri-list') || '').split('\n')[0].trim();
-    if (!url) {
-      var tp = (e.dataTransfer.getData('text/plain') || '').trim();
-      if (/^https?:\/\/\S+$/i.test(tp)) url = tp;
+  if (dt.items && dt.items.length) {
+    for (var k = 0; k < dt.items.length; k++) {
+      var it = dt.items[k];
+      if (it.kind === 'file' && /^image\//.test(it.type || '')) {
+        var gf = it.getAsFile && it.getAsFile();
+        if (gf && gf.size > 0) { loadFlyerFile(gf); return true; }
+      }
     }
-  } catch (err) { /* 取得できない形式だった */ }
-  if (url && /^https?:\/\//i.test(url)) { intakeFlyerUrl(url); return; }
-  toast('画像ファイルが見つかりませんでした');
+  }
+  var url = extractDropUrl_(dt);
+  if (url && /^https?:\/\//i.test(url)) { intakeFlyerUrl(url); return true; }
+  return false;
+}
+flyerZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!handleDropData_(e.dataTransfer)) toast('画像ファイルが見つかりませんでした');
+});
+// フォームのどこに落としても取り込めるようにする
+$('dlg').addEventListener('drop', function(e) {
+  if (handleDropData_(e.dataTransfer)) { e.preventDefault(); e.stopPropagation(); }
+});
+$('dlg').addEventListener('dragover', function(e) { e.preventDefault(); });
+// 画像やURLのコピペでも取り込めるようにする (入力欄への通常の貼り付けは邪魔しない)
+document.addEventListener('paste', function(e) {
+  var dlg = $('dlg');
+  if (!dlg || !dlg.open) return;
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  if (handleDropData_(e.clipboardData)) e.preventDefault();
 });
 
 $('flyerUrlBtn').addEventListener('click', function () {
@@ -1429,8 +1465,19 @@ $('flyerUrlBtn').addEventListener('click', function () {
   intakeFlyerUrl(u);
 });
 
+/** 画像URLの表記ゆれを直す (&amp; のデコード、X画像は大きいサイズに統一) */
+function normalizeImageUrl_(url) {
+  var u = String(url || '').replace(/&amp;/g, '&').trim();
+  if (/pbs\.twimg\.com\/media\//.test(u)) {
+    if (/[?&]name=/.test(u)) u = u.replace(/([?&])name=[^&]*/, '$1name=large');
+    else u += (u.indexOf('?') >= 0 ? '&' : '?') + 'name=large';
+  }
+  return u;
+}
+
 /** ドロップされたURLを取り込む。Xの投稿URLなら投稿の1枚目の画像に解決する */
 function intakeFlyerUrl(url) {
+  url = normalizeImageUrl_(url);
   if (/(?:x\.com|twitter\.com)\/[^\/]+\/status\/\d+/.test(url)) {
     toast('投稿から画像を取り込んでいます…');
     google.script.run.withSuccessHandler(function (r) {
@@ -1444,9 +1491,25 @@ function intakeFlyerUrl(url) {
   loadFlyerFromUrl(url);
 }
 
-/** 画像URLをフライヤーとして取り込む。まず通常読み込みを試し、ダメならサーバー経由で取り込む */
+/** 画像URLをフライヤーとして取り込む。まずブラウザから直接データ取得を試す (pbs.twimg.com等はCORS許可あり) */
 function loadFlyerFromUrl(url) {
+  url = normalizeImageUrl_(url);
   toast('画像を読み込んでいます…', 2500);
+  fetch(url).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.blob();
+  }).then(function (blob) {
+    if (!/^image\//.test(blob.type || '')) throw new Error('not image');
+    var ext = blob.type === 'image/png' ? '.png' : (blob.type === 'image/webp' ? '.webp' : '.jpg');
+    loadFlyerFile(new File([blob], 'flyer' + ext, { type: blob.type }));
+    toast('画像を取り込みました');
+  }).catch(function () {
+    probeFallback_(url);
+  });
+}
+
+/** 直接取得できない画像向け: 表示プローブ→ダメならサーバー経由 */
+function probeFallback_(url) {
   var done = false;
   var probe = new Image();
   var timer = setTimeout(function () {
