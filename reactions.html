@@ -54,6 +54,7 @@ var ITEMS = [];
 var RP_SIZE = 30;
 try { RP_SIZE = parseInt(localStorage.getItem('gekko_rp_size') || '30', 10) || 30; } catch (e) {}
 var RP_PAGE = 1;
+try { RP_PAGE = parseInt(localStorage.getItem('gekko_rp_page') || '1', 10) || 1; } catch (e) {}
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -106,6 +107,7 @@ function render() {
       if (el) el.innerHTML = embedHtml(m, it.url);
     }).catch(function () { /* リンク表示のまま */ });
   });
+  try { localStorage.setItem('gekko_rp_page', String(RP_PAGE)); } catch (e) {}
   var pg = document.getElementById('pager');
   if (pages <= 1) { pg.innerHTML = ''; return; }
   pg.innerHTML = '<button id="pgPrev"' + (RP_PAGE <= 1 ? ' disabled' : '') + '>← 前へ</button>' +
@@ -114,21 +116,29 @@ function render() {
   document.getElementById('pgPrev').addEventListener('click', function () { if (RP_PAGE > 1) { RP_PAGE--; window.scrollTo(0, 0); render(); } });
   document.getElementById('pgNext').addEventListener('click', function () { if (RP_PAGE < pages) { RP_PAGE++; window.scrollTo(0, 0); render(); } });
 }
+function applyData_(r) {
+  ITEMS = [];
+  (r.events || []).forEach(function (ev) {
+    String(ev.mediaUrls || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (u) {
+      ITEMS.push({ ev: ev, url: u });
+    });
+  });
+  document.getElementById('count').textContent = ITEMS.length + '件の反応 / ' + (r.events || []).length + 'イベント';
+  document.getElementById('msg').style.display = ITEMS.length ? 'none' : 'block';
+  if (!ITEMS.length) document.getElementById('msg').textContent = 'まだ反応が登録されていません';
+  render();
+}
 function load() {
+  var cached = null;
+  try { cached = JSON.parse(localStorage.getItem('gekko_react_v2') || 'null'); } catch (e) {}
+  if (cached && cached.events) applyData_(cached);
   apiGet({ action: 'reactions' }).then(function (r) {
     if (!r || !r.ok) throw new Error('load failed');
-    ITEMS = [];
-    (r.events || []).forEach(function (ev) {
-      String(ev.mediaUrls || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (u) {
-        ITEMS.push({ ev: ev, url: u });
-      });
-    });
-    document.getElementById('count').textContent = ITEMS.length + '件の反応 / ' + (r.events || []).length + 'イベント';
-    document.getElementById('msg').style.display = ITEMS.length ? 'none' : 'block';
-    if (!ITEMS.length) document.getElementById('msg').textContent = 'まだ反応が登録されていません';
-    render();
+    var changed = JSON.stringify(r.events) !== JSON.stringify(cached && cached.events);
+    try { localStorage.setItem('gekko_react_v2', JSON.stringify({ events: r.events })); } catch (e) {}
+    if (!cached || changed) applyData_(r);
   }).catch(function () {
-    document.getElementById('msg').textContent = '読み込みに失敗しました。時間をおいて再読み込みしてください';
+    if (!cached) document.getElementById('msg').textContent = '読み込みに失敗しました。時間をおいて再読み込みしてください';
   });
 }
 document.getElementById('shuffleBtn').addEventListener('click', function () { shuffleArr(ITEMS); RP_PAGE = 1; render(); });

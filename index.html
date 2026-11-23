@@ -289,7 +289,13 @@ function apiCall_(action, fields) {
   if (fields) Object.keys(fields).forEach(function (k) { body[k] = fields[k]; });
   return fetch(API_BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(function (r) { return r.json(); })
-    .then(function (j) { if (j && j.ok === false) throw new Error(j.error || 'API error'); return j; });
+    .then(function (j) {
+      if (j && j.ok === false) throw new Error(j.error || 'API error');
+      if ({ create: 1, update: 1, delete: 1, setMediaUrls: 1, addFlyerImage: 1, removeFlyerImage: 1, removeThumbImage: 1, sync: 1 }[action]) {
+        try { localStorage.removeItem('gekko_snap_v2'); } catch (e) {}
+      }
+      return j;
+    });
 }
 var METHOD_MAP_ = {
   listEventsPage: function (a) { return apiCall_('listPage', a[0] || {}); },
@@ -341,6 +347,36 @@ var PAGE_SIZE = 10;
 try { PAGE_SIZE = parseInt(localStorage.getItem('gekko_page_size') || '10', 10) || 10; } catch (e) {}
 var PAGE_NUM = 1;
 var PAGE_CACHE = {};
+var SNAP_KEY = 'gekko_snap_v2';
+var UI_KEY = 'gekko_ui_v2';
+function snapLoad_() { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch (e) { return null; } }
+function snapSaveAll_() {
+  try {
+    if (!ALL_EVENTS) return;
+    var s = snapLoad_() || { pages: {} };
+    s.all = ALL_EVENTS; s.ts = Date.now();
+    localStorage.setItem(SNAP_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
+function snapSavePage_(key, val) {
+  try {
+    var s = snapLoad_() || { pages: {} };
+    s.pages = s.pages || {};
+    s.pages[key] = val;
+    var keys = Object.keys(s.pages);
+    while (keys.length > 6) { delete s.pages[keys.shift()]; }
+    s.ts = Date.now();
+    localStorage.setItem(SNAP_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
+function saveUi_() {
+  try {
+    localStorage.setItem(UI_KEY, JSON.stringify({
+      section: section, filter: filter, missingFilter: missingFilter, viewMode: viewMode,
+      sortDir: sortDir, pageSize: PAGE_SIZE, pageNum: PAGE_NUM
+    }));
+  } catch (e) {}
+}
 var shownCount = PAGE_SIZE;
 var LAST_PAGE = [];
 var TOTAL_COUNT = 0; // v12: サーバー側の該当件数
@@ -525,7 +561,7 @@ function load(append) {
   // 再読み込みで「探し直し」にならないよう、明示的な画面切替のとき以外はスクロール位置を保持する
   if (!window._resetScroll) window._pendingScrollY = window.scrollY || 0;
   window._resetScroll = false;
-  if (!append) { ALL_EVENTS = null; PAGE_NUM = 1; PAGE_CACHE = {}; }
+  if (!append) { ALL_EVENTS = null; PAGE_NUM = window._initPageNum || 1; window._initPageNum = null; PAGE_CACHE = {}; }
   // v20: 初期表示は doGet が埋め込んだ先頭ページを使い、サーバー往復なしで即表示する
   if (!append && window.INITIAL_PAGE && section === 'upcoming' && !filter && !searchText && !missingFilter && viewMode === 'card' && sortDir.upcoming === 'asc') {
     var res0 = window.INITIAL_PAGE;
@@ -546,34 +582,55 @@ function load(append) {
 
 function pageKey_(n) { return section + '|' + filter + '|' + sortDir[section] + '|' + PAGE_SIZE + '|' + n; }
 
-function fetchPage_(n) {
+function fetchPage_(n, mode) {
   var el = $('list');
   var key = pageKey_(n);
   if (PAGE_CACHE[key]) {
-    var c = PAGE_CACHE[key];
-    EVENTS = c.events; TOTAL_COUNT = c.total; HAS_MORE = c.hasMore;
+    var c0 = PAGE_CACHE[key];
+    EVENTS = c0.events; TOTAL_COUNT = c0.total; HAS_MORE = c0.hasMore;
     try { render(); } catch (err) {
       el.innerHTML = '<p class="note">表示でエラーが出ました: ' + esc(err.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
     }
     return;
   }
-  el.innerHTML = '<p class="note">読み込み中…</p>';
-  if (window._loadTimer) clearTimeout(window._loadTimer);
-  window._loadTimer = setTimeout(function() {
-    el.innerHTML = '<p class="note">読み込みが終わりませんでした。</p><div class="row"><button onclick="load()">再読み込み</button></div>';
-  }, 20000);
+  var snap = snapLoad_();
+  if (!mode && snap && snap.pages && snap.pages[key]) {
+    var cs = snap.pages[key];
+    PAGE_CACHE[key] = cs;
+    EVENTS = cs.events; TOTAL_COUNT = cs.total; HAS_MORE = cs.hasMore;
+    try { render(); } catch (e) {}
+    fetchPage_(n, 'reval');
+    return;
+  }
+  if (mode !== 'reval' && mode !== 'bg') {
+    el.innerHTML = '<p class="note">読み込み中…</p>';
+    if (window._loadTimer) clearTimeout(window._loadTimer);
+    window._loadTimer = setTimeout(function() {
+      el.innerHTML = '<p class="note">読み込みが終わりませんでした。</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+    }, 20000);
+  }
   google.script.run.withSuccessHandler(function(res) {
     if (window._loadTimer) clearTimeout(window._loadTimer);
     var page = (res && res.events) || [];
-    EVENTS = page;
-    TOTAL_COUNT = (res && res.total) || EVENTS.length;
-    HAS_MORE = !!(res && res.hasMore);
-    PAGE_CACHE[key] = { events: EVENTS, total: TOTAL_COUNT, hasMore: HAS_MORE };
+    var val = { events: page, total: (res && res.total) || page.length, hasMore: !!(res && res.hasMore) };
+    if (mode !== 'bg' && !page.length && n > 1 && val.total > 0) {
+      PAGE_NUM = Math.max(1, Math.ceil(val.total / PAGE_SIZE));
+      fetchPage_(PAGE_NUM);
+      return;
+    }
+    PAGE_CACHE[key] = val;
+    snapSavePage_(key, val);
+    if (mode === 'bg') return;
+    var changed = JSON.stringify(page) !== JSON.stringify(EVENTS);
+    EVENTS = val.events; TOTAL_COUNT = val.total; HAS_MORE = val.hasMore;
+    if (mode === 'reval' && !changed) return;
     try { render(); } catch (err) {
       el.innerHTML = '<p class="note">表示でエラーが出ました: ' + esc(err.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
     }
+    if (mode !== 'reval' && val.hasMore) fetchPage_(n + 1, 'bg');
   }).withFailureHandler(function(e) {
     if (window._loadTimer) clearTimeout(window._loadTimer);
+    if (mode) return;
     el.innerHTML = '<p class="note">読み込み失敗: ' + esc(e.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
   }).listEventsPage({ section: section, status: filter, dir: sortDir[section], offset: (n - 1) * PAGE_SIZE, limit: PAGE_SIZE });
 }
@@ -604,9 +661,22 @@ function needsAll() { return viewMode === 'calendar' || !!missingFilter || !!sea
 function loadAll() {
   var el = $('list');
   if (ALL_EVENTS) { render(); return; }
+  var snap = snapLoad_();
+  if (snap && snap.all && snap.all.length) {
+    ALL_EVENTS = snap.all;
+    render();
+    google.script.run.withSuccessHandler(function(list) {
+      var changed = JSON.stringify(list) !== JSON.stringify(ALL_EVENTS);
+      ALL_EVENTS = list || [];
+      snapSaveAll_();
+      if (changed) render();
+    }).withFailureHandler(function() {}).listEvents();
+    return;
+  }
   el.innerHTML = '<p class="note">読み込み中…</p>';
   google.script.run.withSuccessHandler(function(list) {
     ALL_EVENTS = list || [];
+    snapSaveAll_();
     render();
   }).withFailureHandler(function(e) {
     el.innerHTML = '<p class="note">読み込み失敗: ' + esc(e.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
@@ -859,6 +929,7 @@ function gridHtml(ev) {
 }
 
 function render() {
+  saveUi_();
   var el = $('list');
   if (viewMode === 'calendar') { renderCalendar(); return; }
   var items, total, hasMore;
@@ -1738,6 +1809,35 @@ function shareInstagram(id) {
   });
 }
 
+(function restoreUi_() {
+  try {
+    var u = JSON.parse(localStorage.getItem(UI_KEY) || 'null');
+    if (!u) return;
+    if (u.pageSize) {
+      PAGE_SIZE = u.pageSize;
+      var ps = $('pageSizeSel'); if (ps) ps.value = String(PAGE_SIZE);
+    }
+    if (u.section === 'past' || u.section === 'upcoming') {
+      section = u.section;
+      document.querySelectorAll('#sections .chip').forEach(function(c) {
+        c.classList.toggle('on', c.getAttribute('data-s') === section);
+      });
+    }
+    if (typeof u.filter === 'string') { filter = u.filter; $('statusSel').value = filter; }
+    if (typeof u.missingFilter === 'string') { missingFilter = u.missingFilter; $('missingSel').value = missingFilter; }
+    if (u.sortDir) {
+      sortDir = u.sortDir;
+      $('sortBtn').textContent = sortDir[section] === 'desc' ? '日付順：新しい順' : '日付順：古い順';
+    }
+    if (u.viewMode) {
+      viewMode = u.viewMode;
+      document.querySelectorAll('#views .chip').forEach(function(c) {
+        c.classList.toggle('on', c.getAttribute('data-v') === viewMode);
+      });
+    }
+    if (u.pageNum) window._initPageNum = u.pageNum;
+  } catch (e) {}
+})();
 restoreHashState();
 updateSortBtn();
 load();
