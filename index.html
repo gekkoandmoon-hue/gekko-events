@@ -193,6 +193,10 @@
       <option value="正式決定">正式決定</option>
       <option value="公開済み">公開済み</option>
     </select>
+    <select id="pageSizeSel" class="fsel" aria-label="1ページの表示件数">
+      <option value="10">表示：10件</option>
+      <option value="30">表示：30件</option>
+    </select>
     <select id="missingSel" class="fsel" aria-label="不足データで抽出">
       <option value="">不足：すべて</option>
       <option value="any">不足あり</option>
@@ -248,6 +252,10 @@
     <div id="flyerDrop">
       <input type="file" id="fFlyer" accept="image/*">
       <p class="note">画像ファイルはこの枠の中へのドラッグ&ドロップでも放りこめます。画像を選ぶと、下でDiscord用サムネイル（16:9）の切り抜き範囲を選べます。黒い枠の中がサムネイルになります。枠はドラッグで移動、右下の丸で大きさ変更。</p>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <input type="url" id="flyerUrlIn" placeholder="画像URLを貼り付け（Xの画像URLなど）" style="flex:1;">
+        <button type="button" id="flyerUrlBtn">URLから取り込む</button>
+      </div>
     </div>
     <div id="curImgs" style="display:none; margin-top:8px;">
       <p class="note" style="margin:0 0 6px;">現在登録されている画像です。削除と追加は、その場で保存されます（メイン画像の差し替えと切り抜きは下の枠から）。</p>
@@ -330,6 +338,9 @@ var filter = '';
 var section = 'upcoming';
 var sortDir = { upcoming: 'asc', past: 'desc' };
 var PAGE_SIZE = 10;
+try { PAGE_SIZE = parseInt(localStorage.getItem('gekko_page_size') || '10', 10) || 10; } catch (e) {}
+var PAGE_NUM = 1;
+var PAGE_CACHE = {};
 var shownCount = PAGE_SIZE;
 var LAST_PAGE = [];
 var TOTAL_COUNT = 0; // v12: サーバー側の該当件数
@@ -514,7 +525,7 @@ function load(append) {
   // 再読み込みで「探し直し」にならないよう、明示的な画面切替のとき以外はスクロール位置を保持する
   if (!window._resetScroll) window._pendingScrollY = window.scrollY || 0;
   window._resetScroll = false;
-  if (!append) { ALL_EVENTS = null; shownCount = PAGE_SIZE; }
+  if (!append) { ALL_EVENTS = null; PAGE_NUM = 1; PAGE_CACHE = {}; }
   // v20: 初期表示は doGet が埋め込んだ先頭ページを使い、サーバー往復なしで即表示する
   if (!append && window.INITIAL_PAGE && section === 'upcoming' && !filter && !searchText && !missingFilter && viewMode === 'card' && sortDir.upcoming === 'asc') {
     var res0 = window.INITIAL_PAGE;
@@ -530,20 +541,62 @@ function load(append) {
   window._loadTimer = setTimeout(function() {
     el.innerHTML = '<p class="note">読み込みが終わりませんでした。</p><div class="row"><button onclick="load()">再読み込み</button></div>';
   }, 20000);
-  var offset = append ? EVENTS.length : 0;
+  fetchPage_(PAGE_NUM);
+}
+
+function pageKey_(n) { return section + '|' + filter + '|' + sortDir[section] + '|' + PAGE_SIZE + '|' + n; }
+
+function fetchPage_(n) {
+  var el = $('list');
+  var key = pageKey_(n);
+  if (PAGE_CACHE[key]) {
+    var c = PAGE_CACHE[key];
+    EVENTS = c.events; TOTAL_COUNT = c.total; HAS_MORE = c.hasMore;
+    try { render(); } catch (err) {
+      el.innerHTML = '<p class="note">表示でエラーが出ました: ' + esc(err.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+    }
+    return;
+  }
+  el.innerHTML = '<p class="note">読み込み中…</p>';
+  if (window._loadTimer) clearTimeout(window._loadTimer);
+  window._loadTimer = setTimeout(function() {
+    el.innerHTML = '<p class="note">読み込みが終わりませんでした。</p><div class="row"><button onclick="load()">再読み込み</button></div>';
+  }, 20000);
   google.script.run.withSuccessHandler(function(res) {
     if (window._loadTimer) clearTimeout(window._loadTimer);
     var page = (res && res.events) || [];
-    EVENTS = append ? EVENTS.concat(page) : page;
+    EVENTS = page;
     TOTAL_COUNT = (res && res.total) || EVENTS.length;
     HAS_MORE = !!(res && res.hasMore);
+    PAGE_CACHE[key] = { events: EVENTS, total: TOTAL_COUNT, hasMore: HAS_MORE };
     try { render(); } catch (err) {
       el.innerHTML = '<p class="note">表示でエラーが出ました: ' + esc(err.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
     }
   }).withFailureHandler(function(e) {
     if (window._loadTimer) clearTimeout(window._loadTimer);
     el.innerHTML = '<p class="note">読み込み失敗: ' + esc(e.message) + '</p><div class="row"><button onclick="load()">再読み込み</button></div>';
-  }).listEventsPage({ section: section, status: filter, dir: sortDir[section], offset: offset, limit: PAGE_SIZE });
+  }).listEventsPage({ section: section, status: filter, dir: sortDir[section], offset: (n - 1) * PAGE_SIZE, limit: PAGE_SIZE });
+}
+
+/** ページ移動（全体リロードではなく、そのページ分だけを表示し直す） */
+function goPage(n) {
+  var pages = Math.max(1, Math.ceil((needsAll() ? clientTotal_() : TOTAL_COUNT) / PAGE_SIZE));
+  PAGE_NUM = Math.min(Math.max(1, n), pages);
+  window.scrollTo(0, 0);
+  if (needsAll()) { render(); return; }
+  fetchPage_(PAGE_NUM);
+}
+function clientTotal_() {
+  if (missingFilter || searchText) return clientItems().length;
+  return TOTAL_COUNT;
+}
+function pagerHtml(total) {
+  var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (pages <= 1) return '';
+  return '<div class="row" style="justify-content:center;align-items:center;gap:10px;margin-top:10px;">' +
+    '<button onclick="goPage(' + (PAGE_NUM - 1) + ')"' + (PAGE_NUM <= 1 ? ' disabled' : '') + '>← 前へ</button>' +
+    '<span class="note" style="margin:0;">' + PAGE_NUM + ' / ' + pages + ' ページ（全' + total + '件）</span>' +
+    '<button onclick="goPage(' + (PAGE_NUM + 1) + ')"' + (PAGE_NUM >= pages ? ' disabled' : '') + '>次へ →</button></div>';
 }
 
 function needsAll() { return viewMode === 'calendar' || !!missingFilter || !!searchText; }
@@ -812,8 +865,8 @@ function render() {
   if (missingFilter || searchText) {
     var all = clientItems();
     total = all.length;
-    items = all.slice(0, shownCount);
-    hasMore = total > items.length;
+    items = all.slice((PAGE_NUM - 1) * PAGE_SIZE, PAGE_NUM * PAGE_SIZE);
+    hasMore = total > PAGE_NUM * PAGE_SIZE;
   } else {
     items = EVENTS; total = TOTAL_COUNT; hasMore = HAS_MORE;
   }
@@ -831,13 +884,7 @@ function render() {
   if (viewMode === 'list') body = items.map(listRowHtml).join('');
   else if (viewMode === 'grid') body = '<div class="gridwrap">' + items.map(gridHtml).join('') + '</div>';
   else body = items.map(cardHtml).join('');
-  el.innerHTML = body + (hasMore
-    ? '<div class="row" style="justify-content:center;margin-top:4px;"><button onclick="loadMore()">もっと見る（残り' + (total - items.length) + '件）</button></div>'
-    : '');
-}
-function loadMore() {
-  if (needsAll()) { window._pendingScrollY = window.scrollY || 0; shownCount += PAGE_SIZE; render(); return; }
-  load(true);
+  el.innerHTML = body + pagerHtml(total);
 }
 
 function renderCalendar() {
@@ -985,6 +1032,17 @@ $('views').addEventListener('click', function(e) {
   load();
 });
 $('missingSel').addEventListener('change', function() { missingFilter = this.value; window._resetScroll = true; load(); });
+(function() {
+  var sel = $('pageSizeSel');
+  if (!sel) return;
+  sel.value = String(PAGE_SIZE);
+  sel.addEventListener('change', function() {
+    PAGE_SIZE = parseInt(this.value, 10) || 10;
+    try { localStorage.setItem('gekko_page_size', String(PAGE_SIZE)); } catch (e) {}
+    window._resetScroll = true;
+    load();
+  });
+})();
 var _searchTimer = null;
 $('searchBox').addEventListener('input', function() {
   var v = this.value.trim();
@@ -1283,7 +1341,7 @@ flyerZone.addEventListener('drop', function(e) {
   var url = '';
   try {
     var m = (e.dataTransfer.getData('text/html') || '').match(/<img[^>]+src="([^"]+)"/i);
-    if (m) url = m[1].trim();
+    if (m) url = m[1].trim().replace(/&amp;/g, '&');
     if (!url) url = (e.dataTransfer.getData('text/uri-list') || '').split('\n')[0].trim();
     if (!url) {
       var tp = (e.dataTransfer.getData('text/plain') || '').trim();
@@ -1292,6 +1350,12 @@ flyerZone.addEventListener('drop', function(e) {
   } catch (err) { /* 取得できない形式だった */ }
   if (url && /^https?:\/\//i.test(url)) { intakeFlyerUrl(url); return; }
   toast('画像ファイルが見つかりませんでした');
+});
+
+$('flyerUrlBtn').addEventListener('click', function () {
+  var u = ($('flyerUrlIn').value || '').trim();
+  if (!u) { toast('URLを入力してください'); return; }
+  intakeFlyerUrl(u);
 });
 
 /** ドロップされたURLを取り込む。Xの投稿URLなら投稿の1枚目の画像に解決する */
@@ -1312,8 +1376,14 @@ function intakeFlyerUrl(url) {
 /** 画像URLをフライヤーとして取り込む。まず通常読み込みを試し、ダメならサーバー経由で取り込む */
 function loadFlyerFromUrl(url) {
   toast('画像を読み込んでいます…', 2500);
+  var done = false;
   var probe = new Image();
+  var timer = setTimeout(function () {
+    if (done) return; done = true;
+    fetchFlyerViaServer(url);
+  }, 6000);
   probe.onload = function () {
+    if (done) return; done = true; clearTimeout(timer);
     flyerData = null;
     flyerUrl = url;
     $('cropImg').removeAttribute('crossorigin');
@@ -1324,7 +1394,10 @@ function loadFlyerFromUrl(url) {
     requestAnimationFrame(layoutCrop);
     toast('画像URLを取り込みました。保存すると登録されます');
   };
-  probe.onerror = function () { fetchFlyerViaServer(url); };
+  probe.onerror = function () {
+    if (done) return; done = true; clearTimeout(timer);
+    fetchFlyerViaServer(url);
+  };
   probe.src = url;
 }
 
@@ -1332,7 +1405,7 @@ function loadFlyerFromUrl(url) {
 function fetchFlyerViaServer(url) {
   toast('サーバー経由で取り込んでいます…', 4000);
   google.script.run.withSuccessHandler(function (r) {
-    if (!r || !r.base64) { toast('画像を取り込めませんでした', 6000); return; }
+    if (!r || !r.base64) { toast('画像を取り込めませんでした' + (r && r.error ? ': ' + r.error : '') + ' / URL: ' + url.slice(0, 90), 9000); return; }
     flyerUrl = null;
     flyerData = { name: 'flyer.jpg', mime: r.mime || 'image/jpeg', base64: r.base64 };
     $('cropImg').removeAttribute('crossorigin');

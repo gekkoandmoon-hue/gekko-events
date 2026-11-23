@@ -37,15 +37,23 @@
   <h1>みんなの反応</h1>
   <span class="sub" id="count"></span>
   <span style="flex:1"></span>
+  <select id="sizeSel" aria-label="1ページの表示件数" style="font:inherit;border:1px solid #ddd;border-radius:999px;padding:7px 10px;background:#fff;">
+    <option value="10">10件</option>
+    <option value="30">30件</option>
+  </select>
   <button class="primary" id="shuffleBtn">シャッフル</button>
 </header>
 <main>
   <div class="msg" id="msg">読み込んでいます…</div>
   <div class="grid" id="grid"></div>
+  <div id="pager" style="text-align:center;padding:18px 0 6px;"></div>
 </main>
 <script>
 var API_BASE = 'https://gekko-events-api.gekkoandmoon.workers.dev';
 var ITEMS = [];
+var RP_SIZE = 30;
+try { RP_SIZE = parseInt(localStorage.getItem('gekko_rp_size') || '30', 10) || 30; } catch (e) {}
+var RP_PAGE = 1;
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -80,18 +88,31 @@ function embedHtml(m, url) {
 }
 function render() {
   var grid = document.getElementById('grid');
-  grid.innerHTML = ITEMS.map(function (it, i) {
+  var pages = Math.max(1, Math.ceil(ITEMS.length / RP_SIZE));
+  if (RP_PAGE > pages) RP_PAGE = pages;
+  var start = (RP_PAGE - 1) * RP_SIZE;
+  var slice = ITEMS.slice(start, start + RP_SIZE);
+  grid.innerHTML = slice.map(function (it, k) {
+    var i = start + k;
     return '<div class="card"><div class="embed" id="emb' + i + '"><span class="plink">' + esc(it.url) + '</span></div>' +
       '<div class="evinfo"><div class="t">' + esc(it.ev.title) + '</div>' +
       '<div class="d">' + esc(it.ev.startText || '') + (it.ev.venue ? ' / ' + esc(it.ev.venue) : '') + '</div>' +
       '<a href="index.html#event=' + encodeURIComponent(it.ev.id) + '">このイベントを見る →</a></div></div>';
   }).join('');
-  ITEMS.forEach(function (it, i) {
+  slice.forEach(function (it, k) {
+    var i = start + k;
     apiGet({ action: 'postMedia', url: it.url }).then(function (m) {
       var el = document.getElementById('emb' + i);
       if (el) el.innerHTML = embedHtml(m, it.url);
     }).catch(function () { /* リンク表示のまま */ });
   });
+  var pg = document.getElementById('pager');
+  if (pages <= 1) { pg.innerHTML = ''; return; }
+  pg.innerHTML = '<button id="pgPrev"' + (RP_PAGE <= 1 ? ' disabled' : '') + '>← 前へ</button>' +
+    '<span style="margin:0 12px;color:#666;font-size:13px;">' + RP_PAGE + ' / ' + pages + ' ページ（全' + ITEMS.length + '件）</span>' +
+    '<button id="pgNext"' + (RP_PAGE >= pages ? ' disabled' : '') + '>次へ →</button>';
+  document.getElementById('pgPrev').addEventListener('click', function () { if (RP_PAGE > 1) { RP_PAGE--; window.scrollTo(0, 0); render(); } });
+  document.getElementById('pgNext').addEventListener('click', function () { if (RP_PAGE < pages) { RP_PAGE++; window.scrollTo(0, 0); render(); } });
 }
 function load() {
   apiGet({ action: 'reactions' }).then(function (r) {
@@ -110,7 +131,17 @@ function load() {
     document.getElementById('msg').textContent = '読み込みに失敗しました。時間をおいて再読み込みしてください';
   });
 }
-document.getElementById('shuffleBtn').addEventListener('click', function () { shuffleArr(ITEMS); render(); });
+document.getElementById('shuffleBtn').addEventListener('click', function () { shuffleArr(ITEMS); RP_PAGE = 1; render(); });
+(function () {
+  var sel = document.getElementById('sizeSel');
+  sel.value = String(RP_SIZE);
+  sel.addEventListener('change', function () {
+    RP_SIZE = parseInt(this.value, 10) || 30;
+    try { localStorage.setItem('gekko_rp_size', String(RP_SIZE)); } catch (e) {}
+    RP_PAGE = 1;
+    render();
+  });
+})();
 load();
 </script>
 </body>
