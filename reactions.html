@@ -28,6 +28,7 @@
   .evinfo { border-top: 1px solid #eee; padding: 10px 12px; margin-top: auto; }
   .evinfo .t { font-weight: 700; font-size: 14px; }
   .evinfo .d { color: #666; font-size: 12px; margin-top: 2px; }
+  .role { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid #6c3483; color: #6c3483; background: #f5eef8; margin: 4px 4px 0 0; }
   .evinfo a { display: inline-block; margin-top: 6px; font-size: 12px; color: #FF2E88; text-decoration: none; font-weight: 700; }
   .msg { text-align: center; color: #888; padding: 40px 0; }
   .seg { display: inline-flex; border: 1px solid #ddd; border-radius: 999px; overflow: hidden; }
@@ -97,6 +98,11 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
 }
+function roleChips(ev) {
+  var t = String((ev && ev.tags) || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+  if (!t.length) return '';
+  return '<div>' + t.map(function (x) { return '<span class="role">' + esc(x) + '</span>'; }).join('') + '</div>';
+}
 function apiGet(params) {
   var qs = Object.keys(params).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
   return fetch(API_BASE + '?' + qs).then(function (r) { return r.json(); });
@@ -135,6 +141,7 @@ function render() {
     return '<div class="card"><div class="embed" id="emb' + i + '"><span class="plink">' + esc(it.url) + '</span></div>' +
       '<div class="evinfo"><div class="t">' + esc(it.ev.title) + '</div>' +
       '<div class="d">' + esc(it.ev.startText || '') + (it.ev.venue ? ' / ' + esc(it.ev.venue) : '') + '</div>' +
+      roleChips(it.ev) +
       '<a href="index.html#event=' + encodeURIComponent(it.ev.id) + '">このイベントを見る →</a></div></div>';
   }).join('');
   slice.forEach(function (it, k) {
