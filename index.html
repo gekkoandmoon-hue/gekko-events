@@ -122,6 +122,7 @@
   .gitem .glabel { font-size:11px; color:#555555; margin:4px 0 2px; }
   .miss { display:inline-block; font-size:10px; padding:1px 6px; border-radius:999px; border:1px solid #c0392b; color:#c0392b; margin-right:4px; }
   .role { display:inline-block; font-size:10px; padding:1px 6px; border-radius:999px; border:1px solid #6c3483; color:#6c3483; background:#f5eef8; margin-right:4px; }
+  .genre { display:inline-block; font-size:10px; padding:1px 6px; border-radius:999px; border:1px solid #117a65; color:#117a65; background:#e8f6f3; margin-right:4px; }
   .rolechk { display:inline-flex; align-items:center; gap:4px; font-size:13px; margin:2px 10px 2px 0; }
   .calnav { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
   .calnav .ct { font-weight:700; font-size:15px; }
@@ -208,6 +209,9 @@
       <option value="配信">配信</option>
       <option value="レジデント">レジデント</option>
     </select>
+    <select id="genreSel" class="fsel" aria-label="ジャンルで絞り込み">
+      <option value="">ジャンル：すべて</option>
+    </select>
     <select id="pageSizeSel" class="fsel" aria-label="1ページの表示件数">
       <option value="10">表示：10件</option>
       <option value="30">表示：30件</option>
@@ -258,6 +262,9 @@
     <button type="button" class="addbtn" onclick="addTagInput('')">＋ タグを追加</button>
     <label>役割タグ（複数OK）</label>
     <div id="fRoles"></div>
+    <label>ジャンル（複数OK・自由に追加可）</label>
+    <div id="fGenres"></div>
+    <input id="fGenreNew" placeholder="新しいジャンル（、か , で区切ると複数追加）">
     <label>イベント詳細文</label>
     <textarea id="fDetails"></textarea>
     <label>みんなの投稿（来場者がXやInstagramに上げてくれた動画・写真のURL）</label>
@@ -389,7 +396,7 @@ function snapSavePage_(key, val) {
 function saveUi_() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify({
-      section: section, filter: filter, missingFilter: missingFilter, roleFilter: roleFilter, viewMode: viewMode,
+      section: section, filter: filter, missingFilter: missingFilter, roleFilter: roleFilter, genreFilter: genreFilter, viewMode: viewMode,
       sortDir: sortDir, pageSize: PAGE_SIZE, pageNum: PAGE_NUM
     }));
   } catch (e) {}
@@ -413,6 +420,33 @@ function roleChips(ev) {
   var t = parseTags(ev.tags);
   if (!t.length) return '';
   return '<div style="margin-top:4px;">' + t.map(function(x) { return '<span class="role">' + esc(x) + '</span>'; }).join('') + '</div>';
+}
+var genreFilter = '';  // '' | 使用中ジャンルのいずれか
+var GENRE_STARTERS = ['アニソン', 'アニリミ', 'オールジャンル', 'Techno', 'Drum&Bass'];
+function knownGenres_() {
+  var set = {};
+  GENRE_STARTERS.forEach(function(g) { set[g] = true; });
+  (ALL_EVENTS || (typeof EVENTS !== 'undefined' ? EVENTS : null) || []).forEach(function(ev) {
+    parseTags(ev.genres).forEach(function(g) { set[g] = true; });
+  });
+  return Object.keys(set);
+}
+function genreChips(ev) {
+  var t = parseTags(ev.genres);
+  if (!t.length) return '';
+  return '<div style="margin-top:4px;">' + t.map(function(x) { return '<span class="genre">' + esc(x) + '</span>'; }).join('') + '</div>';
+}
+function refreshGenreSel_() {
+  var sel = $('genreSel');
+  if (!sel) return;
+  var cur = genreFilter;
+  var opts = ['<option value="">ジャンル：すべて</option>'].concat(knownGenres_().map(function(g) {
+    return '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+  }));
+  var html = opts.join('');
+  if (sel.innerHTML !== html) sel.innerHTML = html;
+  sel.value = cur;
+  if (sel.value !== cur) { genreFilter = ''; }
 }
 var ALL_EVENTS = null;   // カレンダー・不足抽出用の全件キャッシュ
 var calCursor = null;    // カレンダーの表示月 (その月の1日)
@@ -590,7 +624,7 @@ function load(append) {
   window._resetScroll = false;
   if (!append) { ALL_EVENTS = null; PAGE_NUM = window._initPageNum || 1; window._initPageNum = null; PAGE_CACHE = {}; }
   // v20: 初期表示は doGet が埋め込んだ先頭ページを使い、サーバー往復なしで即表示する
-  if (!append && window.INITIAL_PAGE && section === 'upcoming' && !filter && !searchText && !missingFilter && !roleFilter && viewMode === 'card' && sortDir.upcoming === 'asc') {
+  if (!append && window.INITIAL_PAGE && section === 'upcoming' && !filter && !searchText && !missingFilter && !roleFilter && !genreFilter && viewMode === 'card' && sortDir.upcoming === 'asc') {
     var res0 = window.INITIAL_PAGE;
     window.INITIAL_PAGE = null;
     EVENTS = res0.events || [];
@@ -671,7 +705,7 @@ function goPage(n) {
   fetchPage_(PAGE_NUM);
 }
 function clientTotal_() {
-  if (missingFilter || searchText || roleFilter) return clientItems().length;
+  if (missingFilter || searchText || roleFilter || genreFilter) return clientItems().length;
   return TOTAL_COUNT;
 }
 function pagerHtml(total) {
@@ -683,7 +717,7 @@ function pagerHtml(total) {
     '<button onclick="goPage(' + (PAGE_NUM + 1) + ')"' + (PAGE_NUM >= pages ? ' disabled' : '') + '>次へ →</button></div>';
 }
 
-function needsAll() { return viewMode === 'calendar' || !!missingFilter || !!searchText || !!roleFilter; }
+function needsAll() { return viewMode === 'calendar' || !!missingFilter || !!searchText || !!roleFilter || !!genreFilter; }
 
 function loadAll() {
   var el = $('list');
@@ -742,7 +776,7 @@ function searchHaystack(ev) {
     var y = d.getFullYear(), m = pad2(d.getMonth() + 1), dd = pad2(d.getDate());
     dateParts = y + '-' + m + '-' + dd + ' ' + y + '-' + m + ' ' + y + ' ' + y + '/' + m + '/' + dd;
   }
-  return ((ev.title || '') + ' ' + (ev.venue || '') + ' ' + (ev.hashtags || '') + ' ' + (ev.tags || '') + ' ' + (ev.startText || '') + ' ' + dateParts).toLowerCase();
+  return ((ev.title || '') + ' ' + (ev.venue || '') + ' ' + (ev.hashtags || '') + ' ' + (ev.tags || '') + ' ' + (ev.genres || '') + ' ' + (ev.startText || '') + ' ' + dateParts).toLowerCase();
 }
 function clientItems() {
   var nowMs = new Date().getTime();
@@ -761,6 +795,7 @@ function clientItems() {
       if (section === 'past' ? !past : past) return false;
     }
     if (roleFilter && parseTags(ev.tags).indexOf(roleFilter) < 0) return false;
+    if (genreFilter && parseTags(ev.genres).indexOf(genreFilter) < 0) return false;
     if (missingFilter === 'any') return missingOf(ev).length > 0;
     if (missingFilter) return missingOf(ev).some(function(x) { return x[0] === missingFilter; });
     return true;
@@ -933,6 +968,7 @@ function cardHtml(ev) {
       '<div class="meta">' + esc(ev.startText) + (ev.endText ? ' 〜 ' + esc(ev.endText) : '') + '</div>' +
       '<div class="meta">' + esc(ev.venue || '') + '</div>' +
       roleChips(ev) +
+      genreChips(ev) +
       (missingFilter ? missTags(ev) : '') +
       '<div class="tapnote">タップで詳細</div>' +
     '</div>' +
@@ -945,7 +981,7 @@ function listRowHtml(ev) {
     '<div class="lrowmain" onclick="toggleDetail(this.parentNode)">' +
     '<div style="min-width:118px;"><div class="lmeta">' + esc(ev.startText || '') + '</div><div>' + badge(ev.status) + '</div></div>' +
     '<div style="flex:1;min-width:0;"><div class="ltitle">' + esc(ev.title || '？？？') + '</div>' +
-    '<div class="lmeta">' + esc(ev.venue || '') + '</div>' + roleChips(ev) + missTags(ev) +
+    '<div class="lmeta">' + esc(ev.venue || '') + '</div>' + roleChips(ev) + genreChips(ev) + missTags(ev) +
     '<div class="tapnote">タップで詳細</div></div>' +
     '<div><button onclick="event.stopPropagation();openEdit(\'' + ev.id + '\')">編集</button></div></div>' +
     '<div class="ldetail">' + (OPEN_IDS[ev.id] ? detailInner(ev) : '') + '</div></div>';
@@ -957,7 +993,7 @@ function gridHtml(ev) {
     (img ? '<img class="flyer" src="' + imgUrl(img, 400) + '" data-fid="' + img + '" loading="lazy" alt="">' : '<div class="noimg">画像なし</div>') +
     '<div class="tbody"><div class="meta">' + esc(ev.startText || '') + '</div>' +
     '<div class="title">' + esc(ev.title || '？？？') + '</div>' +
-    '<div class="meta">' + esc(ev.venue || '') + '</div>' + roleChips(ev) + missTags(ev) +
+    '<div class="meta">' + esc(ev.venue || '') + '</div>' + roleChips(ev) + genreChips(ev) + missTags(ev) +
     '<div class="tapnote">タップで詳細</div>' +
     '<div class="row"><button onclick="event.stopPropagation();openEdit(\'' + ev.id + '\')">編集</button></div></div></div>' +
     '<div class="tdetail">' + (OPEN_IDS[ev.id] ? detailInner(ev) : '') + '</div></div>';
@@ -965,10 +1001,11 @@ function gridHtml(ev) {
 
 function render() {
   saveUi_();
+  refreshGenreSel_();
   var el = $('list');
   if (viewMode === 'calendar') { renderCalendar(); return; }
   var items, total, hasMore;
-  if (missingFilter || searchText) {
+  if (missingFilter || searchText || roleFilter || genreFilter) {
     var all = clientItems();
     total = all.length;
     items = all.slice((PAGE_NUM - 1) * PAGE_SIZE, PAGE_NUM * PAGE_SIZE);
@@ -1139,6 +1176,7 @@ $('views').addEventListener('click', function(e) {
 });
 $('missingSel').addEventListener('change', function() { missingFilter = this.value; window._resetScroll = true; load(); });
 $('roleSel').addEventListener('change', function() { roleFilter = this.value; window._resetScroll = true; load(); });
+$('genreSel').addEventListener('change', function() { genreFilter = this.value; window._resetScroll = true; load(); });
 (function() {
   var sel = $('pageSizeSel');
   if (!sel) return;
@@ -1177,6 +1215,7 @@ function openForm(ev) {
   $('fUrl').value = ev ? (ev.pageUrl || '') : '';
   buildTagInputs(ev ? ev.hashtags : '');
   buildRoleInputs(ev ? ev.tags : '');
+  buildGenreInputs(ev ? ev.genres : '');
   $('fDetails').value = ev ? (ev.details || '') : '';
   buildMediaInputs(ev ? ev.mediaUrls : '');
   $('fEmbargo').value = ev && ev.embargoDate ? String(ev.embargoDate).slice(0, 10) : '';
@@ -1217,6 +1256,25 @@ function buildRoleInputs(text) {
 function collectRoles() {
   return Array.prototype.filter.call(document.querySelectorAll('#fRoles .rolein'), function(i){ return i.checked; })
     .map(function(i){ return i.value; }).join(',');
+}
+function buildGenreInputs(text) {
+  var cur = parseTags(text);
+  var known = knownGenres_();
+  cur.forEach(function(g) { if (known.indexOf(g) < 0) known.push(g); });
+  $('fGenres').innerHTML = known.map(function(g) {
+    return '<label class="rolechk"><input type="checkbox" class="genrein" value="' + esc(g) + '"' +
+      (cur.indexOf(g) >= 0 ? ' checked' : '') + '> ' + esc(g) + '</label>';
+  }).join('');
+  $('fGenreNew').value = '';
+}
+function collectGenres() {
+  var out = Array.prototype.filter.call(document.querySelectorAll('#fGenres .genrein'), function(i){ return i.checked; })
+    .map(function(i){ return i.value; });
+  String($('fGenreNew').value || '').split(/[,、]/).forEach(function(t) {
+    t = t.trim();
+    if (t && out.indexOf(t) < 0) out.push(t);
+  });
+  return out.join(',');
 }
 function addMediaInput(v) {
   var row = document.createElement('div');
@@ -1718,6 +1776,7 @@ $('saveBtn').onclick = function() {
       pageUrl: $('fUrl').value.trim(),
       hashtags: collectTags(),
       tags: collectRoles(),
+      genres: collectGenres(),
       details: $('fDetails').value,
       mediaUrls: collectMedia(),
       embargoDate: $('fEmbargo').value,
@@ -1938,6 +1997,7 @@ function shareInstagram(id) {
     if (typeof u.filter === 'string') { filter = u.filter; $('statusSel').value = filter; }
     if (typeof u.missingFilter === 'string') { missingFilter = u.missingFilter; $('missingSel').value = missingFilter; }
     if (typeof u.roleFilter === 'string') { roleFilter = u.roleFilter; var rs = $('roleSel'); if (rs) rs.value = roleFilter; }
+    if (typeof u.genreFilter === 'string') { genreFilter = u.genreFilter; }
     if (u.sortDir) {
       sortDir = u.sortDir;
       $('sortBtn').textContent = sortDir[section] === 'desc' ? '日付順：新しい順' : '日付順：古い順';
