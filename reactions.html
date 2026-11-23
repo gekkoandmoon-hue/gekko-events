@@ -30,6 +30,17 @@
   .evinfo .d { color: #666; font-size: 12px; margin-top: 2px; }
   .evinfo a { display: inline-block; margin-top: 6px; font-size: 12px; color: #FF2E88; text-decoration: none; font-weight: 700; }
   .msg { text-align: center; color: #888; padding: 40px 0; }
+  .seg { display: inline-flex; border: 1px solid #ddd; border-radius: 999px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; }
+  .seg button.on { background: #FF2E88; color: #fff; font-weight: 700; }
+  .calnav { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .calnav .ct { font-weight: 700; font-size: 15px; }
+  table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; }
+  table.cal th { font-size: 11px; color: #888; padding: 6px 0; }
+  table.cal td { border: 1px solid #e5e5e5; vertical-align: top; height: 92px; padding: 4px; font-size: 11px; }
+  table.cal td.out { color: #bbb; background: #fcfcfc; }
+  table.cal td.today { background: #fff5f9; }
+  .cev { display: block; background: #FF2E88; color: #fff; border-radius: 4px; padding: 2px 5px; margin-top: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -42,6 +53,9 @@
     <option value="asc">開催日が古い順</option>
     <option value="random">ランダム</option>
   </select>
+  <span class="seg" role="group" aria-label="表示切替">
+    <button id="viewCard">カード</button><button id="viewCal">カレンダー</button>
+  </span>
   <select id="sizeSel" aria-label="1ページの表示件数" style="font:inherit;border:1px solid #ddd;border-radius:999px;padding:7px 10px;background:#fff;">
     <option value="10">10件</option>
     <option value="30">30件</option>
@@ -69,6 +83,10 @@ try {
   QUERY = _params.get('q') || '';
   EVENT_ID = _params.get('event') || '';
 } catch (e) {}
+var VIEW = 'card';
+try { VIEW = localStorage.getItem('gekko_rp_view') || 'card'; } catch (e) {}
+if (VIEW !== 'calendar') VIEW = 'card';
+var CAL_CURSOR = null;
 var RP_SIZE = 30;
 try { RP_SIZE = parseInt(localStorage.getItem('gekko_rp_size') || '30', 10) || 30; } catch (e) {}
 var RP_PAGE = 1;
@@ -106,6 +124,7 @@ function embedHtml(m, url) {
   return '<a class="plink" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>';
 }
 function render() {
+  if (VIEW === 'calendar') { renderCalendar(); return; }
   var grid = document.getElementById('grid');
   var pages = Math.max(1, Math.ceil(ITEMS.length / RP_SIZE));
   if (RP_PAGE > pages) RP_PAGE = pages;
@@ -133,6 +152,74 @@ function render() {
     '<button id="pgNext"' + (RP_PAGE >= pages ? ' disabled' : '') + '>次へ →</button>';
   document.getElementById('pgPrev').addEventListener('click', function () { if (RP_PAGE > 1) { RP_PAGE--; window.scrollTo(0, 0); render(); } });
   document.getElementById('pgNext').addEventListener('click', function () { if (RP_PAGE < pages) { RP_PAGE++; window.scrollTo(0, 0); render(); } });
+}
+function calJump(id) {
+  EVENT_ID = id;
+  VIEW = 'card';
+  try { localStorage.setItem('gekko_rp_view', 'card'); } catch (e) {}
+  syncViewBtns_();
+  RP_PAGE = 1;
+  rebuild(); render();
+  window.scrollTo(0, 0);
+}
+function calMove(d) {
+  if (!CAL_CURSOR) CAL_CURSOR = new Date();
+  CAL_CURSOR = new Date(CAL_CURSOR.getFullYear(), CAL_CURSOR.getMonth() + d, 1);
+  render();
+}
+function renderCalendar() {
+  var grid = document.getElementById('grid');
+  document.getElementById('pager').innerHTML = '';
+  if (!CAL_CURSOR) {
+    var latest = null;
+    ITEMS.forEach(function (it) {
+      var t = new Date(it.ev.start).getTime();
+      if (!isNaN(t) && (latest === null || t > latest)) latest = t;
+    });
+    var base = latest !== null ? new Date(latest) : new Date();
+    CAL_CURSOR = new Date(base.getFullYear(), base.getMonth(), 1);
+  }
+  var y = CAL_CURSOR.getFullYear(), mo = CAL_CURSOR.getMonth();
+  var byDay = {};
+  ITEMS.forEach(function (it) {
+    var d = new Date(it.ev.start);
+    if (isNaN(d.getTime()) || d.getFullYear() !== y || d.getMonth() !== mo) return;
+    var day = d.getDate();
+    byDay[day] = byDay[day] || {};
+    if (!byDay[day][it.ev.id]) byDay[day][it.ev.id] = { ev: it.ev, n: 0 };
+    byDay[day][it.ev.id].n++;
+  });
+  var startDay = new Date(y, mo, 1).getDay();
+  var days = new Date(y, mo + 1, 0).getDate();
+  var prevDays = new Date(y, mo, 0).getDate();
+  var today = new Date();
+  var cells = '';
+  var totalCells = Math.ceil((startDay + days) / 7) * 7;
+  for (var i = 0; i < totalCells; i++) {
+    var dayNum, out = false;
+    if (i < startDay) { dayNum = prevDays - startDay + 1 + i; out = true; }
+    else if (i >= startDay + days) { dayNum = i - startDay - days + 1; out = true; }
+    else dayNum = i - startDay + 1;
+    var isToday = !out && today.getFullYear() === y && today.getMonth() === mo && today.getDate() === dayNum;
+    var chips = '';
+    if (!out && byDay[dayNum]) {
+      chips = Object.keys(byDay[dayNum]).map(function (id) {
+        var e = byDay[dayNum][id];
+        return '<span class="cev" onclick="calJump(\'' + id + '\')" title="' + esc(e.ev.title) + '">' + esc(e.ev.title) + '（' + e.n + '）</span>';
+      }).join('');
+    }
+    cells += '<td class="' + (out ? 'out' : '') + (isToday ? ' today' : '') + '"><div>' + dayNum + '</div>' + chips + '</td>';
+    if (i % 7 === 6) cells += '</tr><tr>';
+  }
+  grid.innerHTML = '<div class="calnav"><button onclick="calMove(-1)">← 前月</button>' +
+    '<span class="ct">' + y + '年' + (mo + 1) + '月</span>' +
+    '<button onclick="calMove(1)">次月 →</button>' +
+    '<span style="color:#888;font-size:12px;">イベントを押すとその反応だけ表示します</span></div>' +
+    '<table class="cal"><tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr><tr>' + cells + '</tr></table>';
+}
+function syncViewBtns_() {
+  document.getElementById('viewCard').classList.toggle('on', VIEW === 'card');
+  document.getElementById('viewCal').classList.toggle('on', VIEW === 'calendar');
 }
 function rebuild() {
   var q = QUERY.trim().toLowerCase();
@@ -213,6 +300,17 @@ document.getElementById('shuffleBtn').addEventListener('click', function () {
     RP_PAGE = 1;
     rebuild(); render();
   });
+  document.getElementById('viewCard').addEventListener('click', function () {
+    VIEW = 'card';
+    try { localStorage.setItem('gekko_rp_view', 'card'); } catch (e) {}
+    syncViewBtns_(); render();
+  });
+  document.getElementById('viewCal').addEventListener('click', function () {
+    VIEW = 'calendar';
+    try { localStorage.setItem('gekko_rp_view', 'calendar'); } catch (e) {}
+    syncViewBtns_(); render();
+  });
+  syncViewBtns_();
   var sel = document.getElementById('sizeSel');
   sel.value = String(RP_SIZE);
   sel.addEventListener('change', function () {
